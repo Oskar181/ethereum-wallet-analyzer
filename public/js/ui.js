@@ -243,14 +243,47 @@ function debugLog(message, level = 'info') {
 }
 
 /**
- * ✅ NAPRAWIONY Show/hide debug panel
+ * ✅ NAPRAWIONY Toggle debug panel visibility - ukrywa tylko zawartość, nie cały panel
+ */
+function toggleDebug() {
+  const debugContent = document.getElementById('debug-content');
+  const debugToggle = document.getElementById('debug-toggle');
+  const debugPanel = document.getElementById('debug');
+  
+  if (debugContent && debugToggle && debugPanel) {
+    // Upewnij się że panel jest widoczny (żeby header był zawsze dostępny)
+    debugPanel.style.display = 'block';
+    
+    const isContentVisible = debugContent.style.display !== 'none';
+    
+    if (isContentVisible) {
+      // Hide debug content (but keep header visible)
+      debugContent.style.display = 'none';
+      debugToggle.textContent = 'Show'; // ✅ Zmiana tekstu na "Show"
+      debugLog('Debug console content hidden', 'info');
+    } else {
+      // Show debug content
+      debugContent.style.display = 'block';
+      debugToggle.textContent = 'Hide'; // ✅ Zmiana tekstu na "Hide"
+      debugLog('Debug console content shown', 'info');
+    }
+  }
+}
+
+/**
+ * ✅ POPRAWIONA funkcja showDebug - też ukrywa tylko zawartość
  */
 function showDebug(show = true) {
   const debugPanel = document.getElementById('debug');
+  const debugContent = document.getElementById('debug-content');
   const debugToggle = document.getElementById('debug-toggle');
   
-  if (debugPanel && debugToggle) {
-    debugPanel.style.display = show ? 'block' : 'none';
+  if (debugPanel && debugContent && debugToggle) {
+    // Panel zawsze widoczny (żeby header był dostępny)
+    debugPanel.style.display = 'block';
+    
+    // Ukryj/pokaż tylko zawartość
+    debugContent.style.display = show ? 'block' : 'none';
     debugToggle.textContent = show ? 'Hide' : 'Show';
     
     if (show && debugDiv) {
