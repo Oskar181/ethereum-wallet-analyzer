@@ -71,16 +71,12 @@ function setupEventListeners() {
   const validateBtn = document.getElementById('validate-btn');
   const clearBtn = document.getElementById('clear-btn');
   const debugToggle = document.getElementById('debug-toggle');
-  const exportBtn = document.getElementById('export-btn');
-  const shareBtn = document.getElementById('share-btn');
   const retryBtn = document.getElementById('retry-btn');
   
   if (analyzeBtn) analyzeBtn.addEventListener('click', startAnalysis);
   if (validateBtn) validateBtn.addEventListener('click', validateInputs);
   if (clearBtn) clearBtn.addEventListener('click', clearInputs);
   if (debugToggle) debugToggle.addEventListener('click', toggleDebug);
-  if (exportBtn) exportBtn.addEventListener('click', exportResults);
-  if (shareBtn) shareBtn.addEventListener('click', shareResults);
   if (retryBtn) retryBtn.addEventListener('click', retryAnalysis);
   
   // Category tabs
