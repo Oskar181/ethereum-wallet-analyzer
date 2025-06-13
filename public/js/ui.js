@@ -80,14 +80,10 @@ function setupEventListeners() {
     });
   });
   
-  // Footer links
-  const loadSampleBtn = document.getElementById('load-sample-data');
+  // ✅ POPRAWIONE Footer links - usunięto niepotrzebne
   const showHelpBtn = document.getElementById('show-help');
-  const showApiDocsBtn = document.getElementById('show-api-docs');
   
-  if (loadSampleBtn) loadSampleBtn.addEventListener('click', (e) => { e.preventDefault(); loadSampleData(); });
   if (showHelpBtn) showHelpBtn.addEventListener('click', (e) => { e.preventDefault(); showHelp(); });
-  if (showApiDocsBtn) showApiDocsBtn.addEventListener('click', (e) => { e.preventDefault(); showApiDocs(); });
   
   // Window resize handler for responsive adjustments
   window.addEventListener('resize', debounce(handleWindowResize, 250));
@@ -247,12 +243,16 @@ function debugLog(message, level = 'info') {
 }
 
 /**
- * Show/hide debug panel
+ * ✅ NAPRAWIONY Show/hide debug panel
  */
 function showDebug(show = true) {
   const debugPanel = document.getElementById('debug');
-  if (debugPanel) {
+  const debugToggle = document.getElementById('debug-toggle');
+  
+  if (debugPanel && debugToggle) {
     debugPanel.style.display = show ? 'block' : 'none';
+    debugToggle.textContent = show ? 'Hide' : 'Show';
+    
     if (show && debugDiv) {
       debugDiv.innerHTML = '';
     }
@@ -260,13 +260,26 @@ function showDebug(show = true) {
 }
 
 /**
- * Toggle debug panel visibility
+ * ✅ NAPRAWIONY Toggle debug panel visibility
  */
 function toggleDebug() {
   const debugPanel = document.getElementById('debug');
-  if (debugPanel) {
+  const debugToggle = document.getElementById('debug-toggle');
+  
+  if (debugPanel && debugToggle) {
     const isVisible = debugPanel.style.display !== 'none';
-    showDebug(!isVisible);
+    
+    if (isVisible) {
+      // Hide debug panel
+      debugPanel.style.display = 'none';
+      debugToggle.textContent = 'Show'; // ✅ Zmiana tekstu na "Show"
+      debugLog('Debug panel hidden', 'info');
+    } else {
+      // Show debug panel
+      debugPanel.style.display = 'block';
+      debugToggle.textContent = 'Hide'; // ✅ Zmiana tekstu na "Hide"
+      debugLog('Debug panel shown', 'info');
+    }
   }
 }
 
@@ -785,22 +798,6 @@ function showToast(message, duration = 3000) {
 }
 
 /**
- * Load sample data
- */
-function loadSampleData() {
-  const sampleData = getSampleData();
-  
-  document.getElementById('wallets').value = sampleData.wallets.join('\n');
-  document.getElementById('tokens').value = sampleData.tokens.join('\n');
-  
-  updateInputCounters();
-  saveInputsToStorage();
-  
-  showToast('📝 Sample data loaded!');
-  debugLog('Sample data loaded');
-}
-
-/**
  * Export results functionality
  */
 function exportResults() {
@@ -867,7 +864,7 @@ function fallbackShare(shareData) {
 }
 
 /**
- * Help and documentation functions
+ * Help function
  */
 function showHelp() {
   const helpContent = `
@@ -890,25 +887,6 @@ function showHelp() {
   `;
   
   showModal('Help & Instructions', helpContent);
-}
-
-function showApiDocs() {
-  const apiContent = `
-    <h3>📚 API Documentation</h3>
-    <p>This application provides REST API endpoints for programmatic access:</p>
-    
-    <h4>Endpoints:</h4>
-    <ul>
-      <li><code>POST /api/analyze</code> - Analyze wallets for tokens</li>
-      <li><code>POST /api/validate-addresses</code> - Validate Ethereum addresses</li>
-      <li><code>GET /api/token-info/:address</code> - Get token information</li>
-      <li><code>GET /api/health</code> - API health check</li>
-    </ul>
-    
-    <p>Visit <code>/api/health</code> for detailed API information.</p>
-  `;
-  
-  showModal('API Documentation', apiContent);
 }
 
 function showModal(title, content) {
