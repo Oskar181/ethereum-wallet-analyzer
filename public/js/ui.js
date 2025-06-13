@@ -54,6 +54,41 @@ function setupEventListeners() {
     tokensInput.addEventListener('paste', handlePasteEvent);
   }
   
+  // Main action buttons
+  const analyzeBtn = document.getElementById('analyze-btn');
+  const validateBtn = document.getElementById('validate-btn');
+  const clearBtn = document.getElementById('clear-btn');
+  const debugToggle = document.getElementById('debug-toggle');
+  const exportBtn = document.getElementById('export-btn');
+  const shareBtn = document.getElementById('share-btn');
+  const retryBtn = document.getElementById('retry-btn');
+  
+  if (analyzeBtn) analyzeBtn.addEventListener('click', startAnalysis);
+  if (validateBtn) validateBtn.addEventListener('click', validateInputs);
+  if (clearBtn) clearBtn.addEventListener('click', clearInputs);
+  if (debugToggle) debugToggle.addEventListener('click', toggleDebug);
+  if (exportBtn) exportBtn.addEventListener('click', exportResults);
+  if (shareBtn) shareBtn.addEventListener('click', shareResults);
+  if (retryBtn) retryBtn.addEventListener('click', retryAnalysis);
+  
+  // Category tabs
+  const tabButtons = document.querySelectorAll('.tab-btn');
+  tabButtons.forEach(tab => {
+    tab.addEventListener('click', () => {
+      const category = tab.dataset.category;
+      if (category) showCategory(category);
+    });
+  });
+  
+  // Footer links
+  const loadSampleBtn = document.getElementById('load-sample-data');
+  const showHelpBtn = document.getElementById('show-help');
+  const showApiDocsBtn = document.getElementById('show-api-docs');
+  
+  if (loadSampleBtn) loadSampleBtn.addEventListener('click', (e) => { e.preventDefault(); loadSampleData(); });
+  if (showHelpBtn) showHelpBtn.addEventListener('click', (e) => { e.preventDefault(); showHelp(); });
+  if (showApiDocsBtn) showApiDocsBtn.addEventListener('click', (e) => { e.preventDefault(); showApiDocs(); });
+  
   // Window resize handler for responsive adjustments
   window.addEventListener('resize', debounce(handleWindowResize, 250));
   
@@ -453,7 +488,7 @@ function populateCategoryResults(category, wallets, totalTokens = 0) {
           <div class="wallet-address">
             <span class="wallet-icon">📁</span>
             <code class="address-text">${wallet.walletAddress}</code>
-            <button class="copy-btn" onclick="copyToClipboard('${wallet.walletAddress}')" title="Copy address">
+            <button class="copy-btn" data-copy="${wallet.walletAddress}" title="Copy address">
               📋
             </button>
           </div>
@@ -484,7 +519,7 @@ function populateCategoryResults(category, wallets, totalTokens = 0) {
                 </div>
                 <div class="token-address">
                   <code>${token.address}</code>
-                  <button class="copy-btn" onclick="copyToClipboard('${token.address}')" title="Copy token address">
+                  <button class="copy-btn" data-copy="${token.address}" title="Copy token address">
                     📋
                   </button>
                 </div>
@@ -502,6 +537,15 @@ function populateCategoryResults(category, wallets, totalTokens = 0) {
   });
   
   resultsDiv.innerHTML = html;
+  
+  // Add event listeners to copy buttons
+  const copyButtons = resultsDiv.querySelectorAll('.copy-btn');
+  copyButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const text = btn.dataset.copy;
+      copyToClipboard(text);
+    });
+  });
 }
 
 /**
@@ -874,7 +918,7 @@ function showModal(title, content) {
     <div class="modal-content">
       <div class="modal-header">
         <h3>${title}</h3>
-        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button>
+        <button class="modal-close">×</button>
       </div>
       <div class="modal-body">
         ${content}
@@ -883,6 +927,12 @@ function showModal(title, content) {
   `;
   
   document.body.appendChild(modal);
+  
+  // Add event listeners
+  const closeBtn = modal.querySelector('.modal-close');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', () => modal.remove());
+  }
   
   // Close on overlay click
   modal.addEventListener('click', (e) => {
@@ -906,16 +956,3 @@ function debounce(func, wait) {
     timeout = setTimeout(later, wait);
   };
 }
-
-// Global functions
-window.validateInputs = validateInputs;
-window.clearInputs = clearInputs;
-window.retryAnalysis = retryAnalysis;
-window.showCategory = showCategory;
-window.toggleDebug = toggleDebug;
-window.copyToClipboard = copyToClipboard;
-window.loadSampleData = loadSampleData;
-window.exportResults = exportResults;
-window.shareResults = shareResults;
-window.showHelp = showHelp;
-window.showApiDocs = showApiDocs;
