@@ -12,34 +12,56 @@ const { logInfo, logError } = require('./utils/debugger');
 const app = express();
 const PORT = process.env.PORT || 10000;
 
+// Trust proxy configuration for deployment platforms (Render, Railway, etc.)
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', true); // Trust first proxy (Render's load balancer)
+} else {
+  app.set('trust proxy', false); // Local development
+}
+
 // Security middleware
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"], // Allow inline scripts for event handlers
       connectSrc: ["'self'", "https://api.etherscan.io", "https://api.coingecko.com", "https://api.dexscreener.com"],
       imgSrc: ["'self'", "data:", "https:"],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      fontSrc: ["'self'", "data:"],
+      frameAncestors: ["'none'"]
     },
   },
 }));
 
 // CORS configuration
+const corsOrigins = process.env.NODE_ENV === 'production' 
+  ? (process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : ['https://*.onrender.com'])
+  : ['http://localhost:10000', 'http://127.0.0.1:10000'];
+
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? ['https://your-render-app.onrender.com'] 
-    : ['http://localhost:10000'],
-  credentials: true
+  origin: corsOrigins,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-requested-with']
 }));
 
-// Rate limiting
+// Rate limiting with proper proxy support
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  max: process.env.NODE_ENV === 'production' ? 50 : 100, // Stricter in production
   message: {
     error: 'Too many requests from this IP, please try again later.',
     retryAfter: '15 minutes'
+  },
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  // Trust proxy setting is inherited from app.set('trust proxy')
+  skip: (req) => {
+    // Skip rate limiting for health checks
+    return req.path === '/health' || req.path === '/api/health';
   }
 });
 
@@ -93,8 +115,14 @@ app.use('*', (req, res) => {
 const server = app.listen(PORT, () => {
   logInfo(`✅ Ethereum Wallet Analyzer started on port ${PORT}`);
   logInfo(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
+  logInfo(`🔒 Trust proxy: ${app.get('trust proxy')}`);
   logInfo(`📁 Serving static files from 'public' directory`);
   logInfo(`🔑 API Key configured: ${!!process.env.ETHERSCAN_API_KEY}`);
+  
+  // Log CORS origins in development
+  if (process.env.NODE_ENV !== 'production') {
+    logInfo(`🌐 CORS origins: ${corsOrigins.join(', ')}`);
+  }
 });
 
 // Graceful shutdown
