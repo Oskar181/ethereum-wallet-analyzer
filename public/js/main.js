@@ -398,7 +398,3 @@ document.addEventListener('DOMContentLoaded', () => {
     debugLog(`⚡ Page loaded in ${loadTime.toFixed(2)}ms`);
   }
 });
-
-// Export functions for global access
-window.startAnalysis = startAnalysis;
-window.performAdvancedValidation = performAdvancedValidation;
