@@ -62,17 +62,17 @@
         </div>
         
         <div class="controls-section">
-            <button class="analyze-btn" id="analyze-btn" onclick="startAnalysis()">
+            <button class="analyze-btn" id="analyze-btn">
                 <span class="btn-icon">🚀</span>
                 <span class="btn-text">Analyze Wallets</span>
             </button>
             
-            <button class="secondary-btn" id="validate-btn" onclick="validateInputs()">
+            <button class="secondary-btn" id="validate-btn">
                 <span class="btn-icon">✅</span>
                 <span class="btn-text">Validate Addresses</span>
             </button>
             
-            <button class="secondary-btn" id="clear-btn" onclick="clearInputs()">
+            <button class="secondary-btn" id="clear-btn">
                 <span class="btn-icon">🗑️</span>
                 <span class="btn-text">Clear All</span>
             </button>
@@ -86,7 +86,7 @@
         <div id="debug" class="debug-panel" style="display: none;">
             <div class="debug-header">
                 <span>🔍 Analysis Console</span>
-                <button class="debug-toggle" onclick="toggleDebug()">Hide</button>
+                <button class="debug-toggle" id="debug-toggle">Hide</button>
             </div>
             <div id="debug-content"></div>
         </div>
@@ -107,10 +107,10 @@
             <div class="results-header">
                 <h2>📊 Analysis Results</h2>
                 <div class="results-actions">
-                    <button class="export-btn" onclick="exportResults()">
+                    <button class="export-btn" id="export-btn">
                         📄 Export Results
                     </button>
-                    <button class="share-btn" onclick="shareResults()">
+                    <button class="share-btn" id="share-btn">
                         🔗 Share Analysis
                     </button>
                 </div>
@@ -120,13 +120,13 @@
             
             <div class="results-content">
                 <div class="category-tabs">
-                    <button class="tab-btn active" onclick="showCategory('all')" id="tab-all">
+                    <button class="tab-btn active" data-category="all" id="tab-all">
                         🎯 ALL Tokens
                     </button>
-                    <button class="tab-btn" onclick="showCategory('some')" id="tab-some">
+                    <button class="tab-btn" data-category="some" id="tab-some">
                         ⚡ SOME Tokens
                     </button>
-                    <button class="tab-btn" onclick="showCategory('none')" id="tab-none">
+                    <button class="tab-btn" data-category="none" id="tab-none">
                         ❌ NO Tokens
                     </button>
                 </div>
@@ -163,7 +163,7 @@
             <div class="error-content">
                 <h3>❌ Analysis Error</h3>
                 <p id="error-message"></p>
-                <button class="retry-btn" onclick="retryAnalysis()">
+                <button class="retry-btn" id="retry-btn">
                     🔄 Retry Analysis
                 </button>
             </div>
@@ -175,9 +175,9 @@
             <div class="footer-section">
                 <h4>🔗 Quick Links</h4>
                 <ul>
-                    <li><a href="#" onclick="loadSampleData()">📝 Load Sample Data</a></li>
-                    <li><a href="#" onclick="showHelp()">❓ Help & Tips</a></li>
-                    <li><a href="#" onclick="showApiDocs()">📚 API Documentation</a></li>
+                    <li><a href="#" id="load-sample-data">📝 Load Sample Data</a></li>
+                    <li><a href="#" id="show-help">❓ Help & Tips</a></li>
+                    <li><a href="#" id="show-api-docs">📚 API Documentation</a></li>
                 </ul>
             </div>
             <div class="footer-section">
