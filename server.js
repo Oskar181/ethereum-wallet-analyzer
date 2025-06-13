@@ -12,9 +12,10 @@ const { logInfo, logError } = require('./utils/debugger');
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-// Trust proxy configuration for deployment platforms (Render, Railway, etc.)
+// ✅ POPRAWIONA KONFIGURACJA TRUST PROXY - to naprawia błąd!
 if (process.env.NODE_ENV === 'production') {
-  app.set('trust proxy', true); // Trust first proxy (Render's load balancer)
+  // Bezpieczna konfiguracja dla Render/Railway/Heroku
+  app.set('trust proxy', 1); // Trust tylko pierwszy proxy
 } else {
   app.set('trust proxy', false); // Local development
 }
@@ -48,7 +49,7 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'x-requested-with']
 }));
 
-// Rate limiting with proper proxy support
+// ✅ POPRAWIONE Rate limiting z bezpiecznym key generator
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: process.env.NODE_ENV === 'production' ? 50 : 100, // Stricter in production
@@ -58,7 +59,10 @@ const limiter = rateLimit({
   },
   standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-  // Trust proxy setting is inherited from app.set('trust proxy')
+  // ✅ Dodany bezpieczny keyGenerator
+  keyGenerator: (req) => {
+    return req.ip; // Użyj IP z trust proxy
+  },
   skip: (req) => {
     // Skip rate limiting for health checks
     return req.path === '/health' || req.path === '/api/health';
