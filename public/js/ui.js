@@ -30,6 +30,18 @@ function initializeUI() {
   // Initialize debug panel
   debugDiv = document.getElementById('debug-content');
   
+  // ✅ Prawidłowa inicjalizacja debug panelu
+  const debugPanel = document.getElementById('debug');
+  const debugContent = document.getElementById('debug-content');
+  const debugToggle = document.getElementById('debug-toggle');
+  
+  if (debugPanel && debugContent && debugToggle) {
+    // Panel widoczny, ale zawartość ukryta na start
+    debugPanel.style.display = 'block';
+    debugContent.style.display = 'none';
+    debugToggle.textContent = 'Show';
+  }
+  
   // Load saved inputs from localStorage
   loadSavedInputs();
   
@@ -293,25 +305,30 @@ function showDebug(show = true) {
 }
 
 /**
- * ✅ NAPRAWIONY Toggle debug panel visibility
+/**
+ * ✅ NAPRAWIONY Toggle debug panel visibility - ukrywa tylko zawartość
  */
 function toggleDebug() {
-  const debugPanel = document.getElementById('debug');
+  const debugContent = document.getElementById('debug-content');
   const debugToggle = document.getElementById('debug-toggle');
+  const debugPanel = document.getElementById('debug');
   
-  if (debugPanel && debugToggle) {
-    const isVisible = debugPanel.style.display !== 'none';
+  if (debugContent && debugToggle && debugPanel) {
+    // Upewnij się że panel jest widoczny (żeby header był zawsze dostępny)
+    debugPanel.style.display = 'block';
     
-    if (isVisible) {
-      // Hide debug panel
-      debugPanel.style.display = 'none';
+    const isContentVisible = debugContent.style.display !== 'none';
+    
+    if (isContentVisible) {
+      // Hide debug content (but keep header visible)
+      debugContent.style.display = 'none';
       debugToggle.textContent = 'Show'; // ✅ Zmiana tekstu na "Show"
-      debugLog('Debug panel hidden', 'info');
+      debugLog('Debug console content hidden', 'info');
     } else {
-      // Show debug panel
-      debugPanel.style.display = 'block';
+      // Show debug content
+      debugContent.style.display = 'block';
       debugToggle.textContent = 'Hide'; // ✅ Zmiana tekstu na "Hide"
-      debugLog('Debug panel shown', 'info');
+      debugLog('Debug console content shown', 'info');
     }
   }
 }
