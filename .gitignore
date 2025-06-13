@@ -1,0 +1,383 @@
+# Ethereum Wallet Analyzer - Git Ignore File
+
+# ========================================
+# ENVIRONMENT & SECRETS
+# ========================================
+.env
+.env.local
+.env.production
+.env.development
+.env.test
+*.pem
+*.key
+*.cert
+
+# API Keys and Secrets
+config/secrets.js
+secrets/
+credentials/
+
+# ========================================
+# NODE.JS
+# ========================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# nyc test coverage
+.nyc_output
+
+# Grunt intermediate storage
+.grunt
+
+# Bower dependency directory
+bower_components
+
+# node-waf configuration
+.lock-wscript
+
+# Compiled binary addons
+build/Release
+
+# Dependency directories
+jspm_packages/
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Microbundle cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# parcel-bundler cache
+.cache
+.parcel-cache
+
+# Next.js build output
+.next
+
+# Nuxt.js build / generate output
+.nuxt
+dist
+
+# Gatsby files
+.cache/
+public
+
+# Storybook build outputs
+.out
+.storybook-out
+
+# ========================================
+# LOGS
+# ========================================
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Diagnostic reports
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# ========================================
+# DATABASES
+# ========================================
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+
+# MongoDB
+mongodb.log
+dump/
+
+# Redis
+redis.log
+dump.rdb
+
+# ========================================
+# TEMPORARY FILES
+# ========================================
+tmp/
+temp/
+.tmp/
+.temp/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ========================================
+# IDE & EDITOR FILES
+# ========================================
+
+# VSCode
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# ========================================
+# DEPLOYMENT & BUILD
+# ========================================
+
+# Build directories
+build/
+dist/
+out/
+
+# Docker
+.dockerignore
+docker-compose.override.yml
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+
+# Kubernetes
+*.yaml.backup
+*.yml.backup
+
+# ========================================
+# TESTING
+# ========================================
+test-results/
+coverage/
+.coverage
+htmlcov/
+.pytest_cache/
+.cache
+
+# Jest
+jest_html_reporters.html
+coverage/
+
+# ========================================
+# ANALYTICS & MONITORING
+# ========================================
+
+# Application logs
+app.log
+error.log
+access.log
+combined.log
+
+# Performance monitoring
+.clinic/
+profile-*/
+
+# ========================================
+# BACKUP & RECOVERY
+# ========================================
+*.backup
+*.bak
+*.old
+*.orig
+backup/
+backups/
+
+# ========================================
+# LOCAL DEVELOPMENT
+# ========================================
+
+# Local configuration overrides
+config.local.js
+constants.local.js
+
+# Development data
+dev-data/
+test-data/
+sample-data/
+
+# Local scripts
+scripts/local/
+scripts/dev/
+
+# ========================================
+# SECURITY SCANNING
+# ========================================
+
+# Security scan results
+security-scan-results/
+vulnerability-report.*
+
+# Audit logs
+audit.log
+security.log
+
+# ========================================
+# PERFORMANCE & PROFILING
+# ========================================
+
+# Node.js profiling
+isolate-*-v8.log
+v8-compile-cache-*/
+
+# Memory dumps
+heapdump-*
+*.heapsnapshot
+
+# ========================================
+# DOCUMENTATION BUILD
+# ========================================
+
+# Generated documentation
+docs/build/
+docs/_build/
+site/
+
+# ========================================
+# PACKAGE MANAGERS
+# ========================================
+
+# Yarn
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+
+# pnpm
+.pnpm-store/
+
+# ========================================
+# MISC
+# ========================================
+
+# MacOS
+.AppleDouble
+.LSOverride
+
+# Icon must end with two \r
+Icon
+
+# Thumbnails
+._*
+
+# Files that might appear in the root of a volume
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Directories potentially created on remote AFP share
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ========================================
+# PROJECT SPECIFIC
+# ========================================
+
+# Analysis results exports
+exports/
+results/
+analysis-*.json
+wallet-analysis-*.csv
+
+# Cached API responses (if implemented)
+.api-cache/
+cache/
+
+# User uploaded files (if any)
+uploads/
+user-data/
+
+# Generated reports
+reports/
+*.pdf
+*.xlsx
