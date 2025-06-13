@@ -1,0 +1,209 @@
+# Ethereum Wallet Analyzer - Docker Compose Configuration
+# Complete development and production environment setup
+
+version: '3.8'
+
+services:
+  # ========================================
+  # Main Application
+  # ========================================
+  app:
+    build:
+      context: .
+      target: production
+      dockerfile: Dockerfile
+    container_name: ethereum-analyzer-app
+    restart: unless-stopped
+    ports:
+      - "10000:10000"
+    environment:
+      - NODE_ENV=production
+      - PORT=10000
+      - LOG_LEVEL=INFO
+      # Add your actual API key here or use .env file
+      - ETHERSCAN_API_KEY=${ETHERSCAN_API_KEY}
+      - REDIS_URL=redis://redis:6379
+      - MONGODB_URI=mongodb://mongodb:27017/ethereum-analyzer
+    env_file:
+      - .env
+    depends_on:
+      - redis
+      - mongodb
+    networks:
+      - app-network
+    volumes:
+      # Mount logs directory for persistence
+      - app-logs:/app/logs
+      # Mount temp directory for file operations
+      - app-temp:/app/temp
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:10000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    labels:
+      - "com.ethereum-analyzer.service=main-app"
+      - "com.ethereum-analyzer.version=2.1.0"
+
+  # ========================================
+  # Redis Cache (Optional but Recommended)
+  # ========================================
+  redis:
+    image: redis:7-alpine
+    container_name: ethereum-analyzer-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-ethereum-analyzer-redis}
+    volumes:
+      - redis-data:/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    labels:
+      - "com.ethereum-analyzer.service=cache"
+
+  # ========================================
+  # MongoDB Database (Optional)
+  # ========================================
+  mongodb:
+    image: mongo:6
+    container_name: ethereum-analyzer-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_USERNAME:-admin}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASSWORD:-ethereum-analyzer-mongo}
+      - MONGO_INITDB_DATABASE=ethereum-analyzer
+    volumes:
+      - mongodb-data:/data/db
+      - mongodb-config:/data/configdb
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    labels:
+      - "com.ethereum-analyzer.service=database"
+
+  # ========================================
+  # Development Services
+  # ========================================
+  
+  # Development app with hot reload
+  app-dev:
+    build:
+      context: .
+      target: development
+      dockerfile: Dockerfile
+    container_name: ethereum-analyzer-dev
+    ports:
+      - "10000:10000"
+    environment:
+      - NODE_ENV=development
+      - PORT=10000
+      - LOG_LEVEL=DEBUG
+      - ETHERSCAN_API_KEY=${ETHERSCAN_API_KEY}
+    env_file:
+      - .env
+    volumes:
+      # Mount source code for hot reload
+      - .:/app
+      - /app/node_modules
+      - dev-logs:/app/logs
+    networks:
+      - app-network
+    profiles:
+      - development
+
+  # Redis Commander (Development)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: ethereum-analyzer-redis-ui
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-ethereum-analyzer-redis}
+    depends_on:
+      - redis
+    networks:
+      - app-network
+    profiles:
+      - development
+
+  # Mongo Express (Development)
+  mongo-express:
+    image: mongo-express:latest
+    container_name: ethereum-analyzer-mongo-ui
+    restart: unless-stopped
+    ports:
+      - "8082:8081"
+    environment:
+      - ME_CONFIG_MONGODB_ADMINUSERNAME=${MONGO_USERNAME:-admin}
+      - ME_CONFIG_MONGODB_ADMINPASSWORD=${MONGO_PASSWORD:-ethereum-analyzer-mongo}
+      - ME_CONFIG_MONGODB_URL=mongodb://${MONGO_USERNAME:-admin}:${MONGO_PASSWORD:-ethereum-analyzer-mongo}@mongodb:27017/
+      - ME_CONFIG_BASICAUTH_USERNAME=admin
+      - ME_CONFIG_BASICAUTH_PASSWORD=ethereum-analyzer
+    depends_on:
+      - mongodb
+    networks:
+      - app-network
+    profiles:
+      - development
+
+# ========================================
+# Networks
+# ========================================
+networks:
+  app-network:
+    driver: bridge
+    labels:
+      - "com.ethereum-analyzer.network=main"
+
+# ========================================
+# Volumes
+# ========================================
+volumes:
+  # Application volumes
+  app-logs:
+    driver: local
+    labels:
+      - "com.ethereum-analyzer.volume=app-logs"
+  
+  app-temp:
+    driver: local
+    labels:
+      - "com.ethereum-analyzer.volume=app-temp"
+
+  # Development volumes
+  dev-logs:
+    driver: local
+    labels:
+      - "com.ethereum-analyzer.volume=dev-logs"
+
+  # Database volumes
+  mongodb-data:
+    driver: local
+    labels:
+      - "com.ethereum-analyzer.volume=mongodb-data"
+  
+  mongodb-config:
+    driver: local
+    labels:
+      - "com.ethereum-analyzer.volume=mongodb-config"
+
+  # Cache volumes
+  redis-data:
+    driver: local
+    labels:
+      - "com.ethereum-analyzer.volume=redis-data"
