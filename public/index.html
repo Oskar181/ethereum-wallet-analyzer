@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔍 Ethereum Wallet Analyzer</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <meta name="description" content="Professional Ethereum wallet analyzer for token detection and portfolio analysis">
+    <meta name="keywords" content="ethereum, wallet, analyzer, cryptocurrency, blockchain, tokens, DeFi">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔍</text></svg>">
+</head>
+<body>
+    <div class="status-indicator" id="status-indicator">
+        <span id="status-icon">🟢</span>
+        <span id="status-text">Online</span>
+    </div>
+    
+    <div class="container">
+        <header class="app-header">
+            <h1>🔍 Ethereum Wallet Analyzer</h1>
+            <p class="app-subtitle">Professional-grade blockchain analysis tool for ERC-20 token detection</p>
+        </header>
+        
+        <div class="input-section">
+            <div class="input-group">
+                <label for="wallets">
+                    📁 Wallet Addresses
+                    <span class="input-hint">(one per line, up to 50 wallets)</span>
+                </label>
+                <textarea 
+                    id="wallets" 
+                    placeholder="0x742d35Cc6634C0532925a3b8D2645Ff9b5B4b6bE
+0x8ba1f109551bD432803012645Hac136c5F7eB4B5B
+0x1234567890123456789012345678901234567890
+..."
+                    spellcheck="false"
+                    autocomplete="off"
+                ></textarea>
+                <div class="input-counter">
+                    <span id="wallet-count">0</span> wallets
+                </div>
+            </div>
+            
+            <div class="input-group">
+                <label for="tokens">
+                    🪙 Token Addresses
+                    <span class="input-hint">(one per line, up to 20 tokens)</span>
+                </label>
+                <textarea 
+                    id="tokens" 
+                    placeholder="0xdAC17F958D2ee523a2206206994597C13D831ec7
+0x95aD61b0a150d79219dCF64E1E6Cc01f0B64C4CE
+0x6B175474E89094C44Da98b954EedeAC495271d0F
+..."
+                    spellcheck="false"
+                    autocomplete="off"
+                ></textarea>
+                <div class="input-counter">
+                    <span id="token-count">0</span> tokens
+                </div>
+            </div>
+        </div>
+        
+        <div class="controls-section">
+            <button class="analyze-btn" id="analyze-btn" onclick="startAnalysis()">
+                <span class="btn-icon">🚀</span>
+                <span class="btn-text">Analyze Wallets</span>
+            </button>
+            
+            <button class="secondary-btn" id="validate-btn" onclick="validateInputs()">
+                <span class="btn-icon">✅</span>
+                <span class="btn-text">Validate Addresses</span>
+            </button>
+            
+            <button class="secondary-btn" id="clear-btn" onclick="clearInputs()">
+                <span class="btn-icon">🗑️</span>
+                <span class="btn-text">Clear All</span>
+            </button>
+        </div>
+        
+        <div id="validation-results" class="validation-section" style="display: none;">
+            <h3>📋 Address Validation Results</h3>
+            <div id="validation-content"></div>
+        </div>
+        
+        <div id="debug" class="debug-panel" style="display: none;">
+            <div class="debug-header">
+                <span>🔍 Analysis Console</span>
+                <button class="debug-toggle" onclick="toggleDebug()">Hide</button>
+            </div>
+            <div id="debug-content"></div>
+        </div>
+        
+        <div id="loading" class="loading-section" style="display: none;">
+            <div class="loading-spinner"></div>
+            <div class="loading-text">
+                <h3>🔄 Analyzing Blockchain Data...</h3>
+                <p id="loading-details">Initializing analysis...</p>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progress-fill"></div>
+                </div>
+                <div class="progress-text" id="progress-text">0%</div>
+            </div>
+        </div>
+        
+        <div id="results" class="results-section" style="display: none;">
+            <div class="results-header">
+                <h2>📊 Analysis Results</h2>
+                <div class="results-actions">
+                    <button class="export-btn" onclick="exportResults()">
+                        📄 Export Results
+                    </button>
+                    <button class="share-btn" onclick="shareResults()">
+                        🔗 Share Analysis
+                    </button>
+                </div>
+            </div>
+            
+            <div class="stats-grid" id="stats"></div>
+            
+            <div class="results-content">
+                <div class="category-tabs">
+                    <button class="tab-btn active" onclick="showCategory('all')" id="tab-all">
+                        🎯 ALL Tokens
+                    </button>
+                    <button class="tab-btn" onclick="showCategory('some')" id="tab-some">
+                        ⚡ SOME Tokens
+                    </button>
+                    <button class="tab-btn" onclick="showCategory('none')" id="tab-none">
+                        ❌ NO Tokens
+                    </button>
+                </div>
+                
+                <div class="category-content">
+                    <div id="category-all" class="category-section active">
+                        <div class="category-header">
+                            <h3>🎯 Perfect Match: ALL Tokens Found</h3>
+                            <p>Wallets containing all specified tokens</p>
+                        </div>
+                        <div id="results-all" class="wallet-results"></div>
+                    </div>
+                    
+                    <div id="category-some" class="category-section">
+                        <div class="category-header">
+                            <h3>⚡ Partial Match: Some Tokens Found</h3>
+                            <p>Wallets containing some of the specified tokens</p>
+                        </div>
+                        <div id="results-some" class="wallet-results"></div>
+                    </div>
+                    
+                    <div id="category-none" class="category-section">
+                        <div class="category-header">
+                            <h3>❌ No Match: No Tokens Found</h3>
+                            <p>Wallets not containing any of the specified tokens</p>
+                        </div>
+                        <div id="results-none" class="wallet-results"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="error-section" class="error-section" style="display: none;">
+            <div class="error-content">
+                <h3>❌ Analysis Error</h3>
+                <p id="error-message"></p>
+                <button class="retry-btn" onclick="retryAnalysis()">
+                    🔄 Retry Analysis
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <footer class="app-footer">
+        <div class="footer-content">
+            <div class="footer-section">
+                <h4>🔗 Quick Links</h4>
+                <ul>
+                    <li><a href="#" onclick="loadSampleData()">📝 Load Sample Data</a></li>
+                    <li><a href="#" onclick="showHelp()">❓ Help & Tips</a></li>
+                    <li><a href="#" onclick="showApiDocs()">📚 API Documentation</a></li>
+                </ul>
+            </div>
+            <div class="footer-section">
+                <h4>📊 Features</h4>
+                <ul>
+                    <li>✅ Real-time blockchain analysis</li>
+                    <li>✅ Multi-source token recognition</li>
+                    <li>✅ Professional categorization</li>
+                    <li>✅ Export & sharing capabilities</li>
+                </ul>
+            </div>
+            <div class="footer-section">
+                <h4>⚙️ Technical</h4>
+                <ul>
+                    <li>🔗 Etherscan API integration</li>
+                    <li>🛡️ Secure backend processing</li>
+                    <li>⚡ Rate-limited requests</li>
+                    <li>🔄 Automatic retry logic</li>
+                </ul>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2025 Ethereum Wallet Analyzer v2.1.0 | Professional Blockchain Analysis Tool</p>
+        </div>
+    </footer>
+
+    <!-- Load JavaScript modules -->
+    <script src="js/api.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
