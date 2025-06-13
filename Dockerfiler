@@ -1,0 +1,133 @@
+# Ethereum Wallet Analyzer - Production Dockerfile
+# Multi-stage build for optimized production image
+
+# ========================================
+# Stage 1: Build Dependencies
+# ========================================
+FROM node:18-alpine AS builder
+
+# Set working directory
+WORKDIR /app
+
+# Add metadata
+LABEL maintainer="Ethereum Wallet Analyzer Team"
+LABEL description="Professional Ethereum wallet analyzer for token detection"
+LABEL version="2.1.0"
+
+# Install build dependencies
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
+    && rm -rf /var/cache/apk/*
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies with npm ci for faster, reliable builds
+RUN npm ci --only=production && npm cache clean --force
+
+# ========================================
+# Stage 2: Production Image
+# ========================================
+FROM node:18-alpine AS production
+
+# Install security updates and dumb-init for proper signal handling
+RUN apk add --no-cache \
+    dumb-init \
+    && rm -rf /var/cache/apk/*
+
+# Create non-root user for security
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S appuser -u 1001 -G nodejs
+
+# Set working directory
+WORKDIR /app
+
+# Copy node_modules from builder stage
+COPY --from=builder --chown=appuser:nodejs /app/node_modules ./node_modules
+
+# Copy application files
+COPY --chown=appuser:nodejs . .
+
+# Remove development files and sensitive data
+RUN rm -rf \
+    .git \
+    .env.example \
+    .gitignore \
+    README.md \
+    Dockerfile \
+    docker-compose.yml \
+    docs/ \
+    tests/ \
+    *.md
+
+# Create necessary directories with proper permissions
+RUN mkdir -p /app/logs /app/temp && \
+    chown -R appuser:nodejs /app/logs /app/temp
+
+# Set environment variables
+ENV NODE_ENV=production
+ENV PORT=10000
+ENV LOG_LEVEL=INFO
+
+# Expose port
+EXPOSE 10000
+
+# Switch to non-root user
+USER appuser
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD node -e "require('http').get('http://localhost:10000/health', (res) => { \
+        if (res.statusCode === 200) process.exit(0); else process.exit(1); \
+    }).on('error', () => process.exit(1));"
+
+# Use dumb-init to handle signals properly
+ENTRYPOINT ["dumb-init", "--"]
+
+# Start the application
+CMD ["node", "server.js"]
+
+# ========================================
+# Development Image (Optional)
+# ========================================
+FROM node:18-alpine AS development
+
+# Install development dependencies
+RUN apk add --no-cache \
+    git \
+    openssh \
+    bash \
+    curl \
+    && rm -rf /var/cache/apk/*
+
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S appuser -u 1001 -G nodejs
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install all dependencies (including devDependencies)
+RUN npm install && npm cache clean --force
+
+# Copy application files
+COPY --chown=appuser:nodejs . .
+
+# Set environment variables for development
+ENV NODE_ENV=development
+ENV PORT=10000
+ENV LOG_LEVEL=DEBUG
+
+# Expose port
+EXPOSE 10000
+
+# Switch to non-root user
+USER appuser
+
+# Development command with nodemon for auto-reload
+CMD ["npm", "run", "dev"]
