@@ -676,15 +676,29 @@ function createWalletResultHTML(wallet, category, totalTokens) {
         <div class="token-list">
           ${wallet.foundTokens.map(token => createTokenItemHTML(token)).join('')}
         </div>
-        ${wallet.totalUsdValueFormatted && wallet.totalUsdValue > 0 ? `
-          <div class="wallet-total-value">
-            <strong>💰 Total Portfolio Value: ${wallet.totalUsdValueFormatted}</strong>
-          </div>
-        ` : `
-          <div class="wallet-total-value" style="color: #ff9800;">
-            ⚠️ Total Portfolio Value: Unable to calculate (missing price data)
-          </div>
-        `}
+       ${wallet.totalUsdValueFormatted && wallet.totalUsdValue > 0 ? `
+  <div class="wallet-total-value">
+    <div style="display: flex; align-items: center; justify-content: space-between;">
+      <div>
+        <strong>🎯 Selected Tokens Value: ${wallet.totalUsdValueFormatted}</strong>
+        <small style="display: block; opacity: 0.8; font-weight: normal; margin-top: 4px;">
+          📊 Sum of ${wallet.foundTokens?.length || 0} matching token(s)
+        </small>
+      </div>
+      <button 
+        onclick="showPortfolioValueInfo()" 
+        style="background: none; border: 1px solid #4caf50; color: #4caf50; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.8rem;"
+        title="What does this mean?"
+      >
+        ❓
+      </button>
+    </div>
+  </div>
+` : `
+  <div class="wallet-total-value" style="color: #ff9800;">
+    ⚠️ Selected Tokens Value: Unable to calculate (missing price data)
+  </div>
+`}
       ` : category !== 'none' ? `
         <div class="no-tokens-found">
           <span class="info-icon">ℹ️</span>
