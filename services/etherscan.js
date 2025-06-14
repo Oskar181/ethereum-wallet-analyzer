@@ -362,7 +362,12 @@ async function getTokenDecimals(tokenAddress, networkId = 'ethereum') {
 }
 
 /**
- * Get comprehensive token information on specified network with USD pricing
+ * POPRAWIONA SEKCJA getTokenInfo w services/etherscan.js
+ * Zastąp funkcję getTokenInfo w swoim pliku tą wersją
+ */
+
+/**
+ * Get comprehensive token information on specified network with USD pricing - POPRAWIONA WERSJA
  */
 async function getTokenInfo(tokenAddress, networkId = 'ethereum', includePricing = true) {
   if (!isValidEthereumAddress(tokenAddress)) {
@@ -427,6 +432,173 @@ async function getTokenInfo(tokenAddress, networkId = 'ethereum', includePricing
         error: error.message,
         network: networkConfig.name 
       });
+      
+      // Fallback to basic info
+      tokenInfo = {
+        address: tokenAddress,
+        symbol: `${tokenAddress.substring(0, 6)}...`,
+        name: `Token: ${tokenAddress.substring(0, 10)}...${tokenAddress.slice(-4)}`,
+        decimals: ANALYSIS_CONFIG.DEFAULT_DECIMALS,
+        source: 'fallback',
+        network: networkId,
+        networkName: networkConfig.name
+      };
+    }
+  }
+  
+  // POPRAWIONA SEKCJA: Add pricing information from DexScreener if requested
+  if (includePricing) {
+    logDebug(`Attempting to fetch price data for ${tokenInfo.symbol} on ${networkConfig.name}`, {
+      tokenAddress: tokenAddress.substring(0, 10) + '...',
+      network: networkId
+    });
+    
+    try {
+      const priceData = await dexScreenerService.getTokenPrice(tokenAddress, networkId);
+      
+      if (priceData && !priceData.error && priceData.priceUsd !== null) {
+        tokenInfo.priceUsd = priceData.priceUsd;
+        tokenInfo.priceChange24h = priceData.priceChange24h;
+        tokenInfo.volume24h = priceData.volume24h;
+        tokenInfo.dexId = priceData.dexId;
+        tokenInfo.pairAddress = priceData.pairAddress;
+        tokenInfo.priceSource = priceData.source || 'dexscreener';
+        
+        logDebug(`✅ Price data added successfully for ${tokenInfo.symbol}`, {
+          priceUsd: tokenInfo.priceUsd,
+          priceChange24h: tokenInfo.priceChange24h,
+          source: tokenInfo.priceSource,
+          network: networkConfig.name
+        });
+      } else {
+        tokenInfo.priceUsd = null;
+        tokenInfo.priceChange24h = null;
+        tokenInfo.priceSource = null;
+        tokenInfo.priceError = priceData?.error || 'Price data unavailable';
+        
+        logDebug(`❌ No price data available for ${tokenInfo.symbol}`, {
+          error: priceData?.error,
+          network: networkConfig.name
+        });
+      }
+    } catch (priceError) {
+      logError(`Failed to fetch price data for token ${tokenAddress} on ${networkConfig.name}`, priceError);
+      tokenInfo.priceUsd = null;
+      tokenInfo.priceChange24h = null;
+      tokenInfo.priceSource = null;
+      tokenInfo.priceError = `Price fetch failed: ${priceError.message}`;
+    }
+  } else {
+    // Jeśli pricing nie jest wymagane, ustaw wartości null
+    tokenInfo.priceUsd = null;
+    tokenInfo.priceChange24h = null;
+    tokenInfo.priceSource = null;
+  }
+  
+  return tokenInfo;
+}
+
+/**
+ * POPRAWIONA WERSJA getMultipleTokenInfo
+ */
+async function getMultipleTokenInfo(tokenAddresses, networkId = 'ethereum', includePricing = true) {
+  if (!Array.isArray(tokenAddresses) || tokenAddresses.length === 0) {
+    return [];
+  }
+
+  if (!isNetworkSupported(networkId)) {
+    throw new Error(`Unsupported network: ${networkId}`);
+  }
+  
+  const networkConfig = getNetworkConfig(networkId);
+  const timer = new PerformanceTimer(`Multiple Token Info - ${tokenAddresses.length} tokens on ${networkConfig.name}`);
+  
+  try {
+    logDebug(`🔄 Fetching multiple token info on ${networkConfig.name}`, {
+      tokenCount: tokenAddresses.length,
+      includePricing: includePricing,
+      network: networkConfig.name
+    });
+    
+    // Get all token info without pricing first
+    const tokenInfoPromises = tokenAddresses.map(address => 
+      getTokenInfo(address, networkId, false) // Don't include pricing yet
+    );
+    
+    const tokenInfos = await Promise.all(tokenInfoPromises);
+    
+    // If pricing is requested, fetch all prices using the improved DexScreener service
+    if (includePricing) {
+      try {
+        logDebug(`🔄 Fetching batch price data for ${tokenAddresses.length} tokens on ${networkConfig.name}`);
+        
+        const priceDataArray = await dexScreenerService.getMultipleTokenPrices(tokenAddresses, networkId);
+        
+        // Merge price data with token info
+        tokenInfos.forEach((tokenInfo, index) => {
+          const priceData = priceDataArray.find(p => 
+            p.address.toLowerCase() === tokenInfo.address.toLowerCase()
+          );
+          
+          if (priceData && !priceData.error && priceData.priceUsd !== null) {
+            tokenInfo.priceUsd = priceData.priceUsd;
+            tokenInfo.priceChange24h = priceData.priceChange24h;
+            tokenInfo.volume24h = priceData.volume24h;
+            tokenInfo.dexId = priceData.dexId;
+            tokenInfo.pairAddress = priceData.pairAddress;
+            tokenInfo.priceSource = priceData.source || 'dexscreener';
+            
+            logDebug(`✅ Price merged for ${tokenInfo.symbol}: $${tokenInfo.priceUsd}`, {
+              network: networkConfig.name
+            });
+          } else {
+            tokenInfo.priceUsd = null;
+            tokenInfo.priceChange24h = null;
+            tokenInfo.priceSource = null;
+            tokenInfo.priceError = priceData?.error || 'Price data unavailable';
+            
+            logDebug(`❌ No price data for ${tokenInfo.symbol}`, {
+              error: priceData?.error,
+              network: networkConfig.name
+            });
+          }
+        });
+        
+        const successfulPrices = tokenInfos.filter(t => t.priceUsd !== null && t.priceUsd > 0).length;
+        logDebug(`💰 Price data summary: ${successfulPrices}/${tokenInfos.length} tokens have USD prices`, {
+          network: networkConfig.name
+        });
+        
+      } catch (priceError) {
+        logError(`Failed to fetch batch price data for ${networkConfig.name}`, priceError);
+        
+        // Set all tokens to have no pricing data but don't fail the whole operation
+        tokenInfos.forEach(tokenInfo => {
+          tokenInfo.priceUsd = null;
+          tokenInfo.priceChange24h = null;
+          tokenInfo.priceSource = null;
+          tokenInfo.priceError = `Batch price fetch failed: ${priceError.message}`;
+        });
+      }
+    }
+    
+    timer.end();
+    
+    logDebug(`✅ Multiple token info completed for ${networkConfig.name}`, {
+      totalTokens: tokenInfos.length,
+      withPricing: includePricing,
+      tokensWithPrices: includePricing ? tokenInfos.filter(t => t.priceUsd !== null).length : 0,
+      network: networkConfig.name
+    });
+    
+    return tokenInfos;
+    
+  } catch (error) {
+    timer.end();
+    logError(`Failed to get multiple token info for ${networkConfig.name}`, error);
+    throw error;
+  }
+}
       
       // Fallback to basic info
       tokenInfo = {
