@@ -1,6 +1,7 @@
 /**
- * Main Application Logic - Ethereum Wallet Analyzer
+ * Main Application Logic - Wallet Analyzer
  * Orchestrates the entire analysis workflow with professional error handling
+ * Now supports multi-chain analysis (Ethereum, Base)
  */
 
 // Global application state
@@ -30,6 +31,10 @@ async function startAnalysis() {
     const wallets = parseAddressInput(walletsInput);
     const tokens = parseAddressInput(tokensInput);
     
+    // Get selected network
+    const selectedNetwork = getSelectedNetwork();
+    const networkName = getNetworkName(selectedNetwork);
+    
     // Final client-side validation
     const walletValidation = validateAddressesClientSide(wallets);
     const tokenValidation = validateAddressesClientSide(tokens);
@@ -51,8 +56,8 @@ async function startAnalysis() {
       return;
     }
     
-    // Start analysis
-    await performAnalysis(walletValidation.valid, tokenValidation.valid);
+    // Start analysis with network information
+    await performAnalysis(walletValidation.valid, tokenValidation.valid, selectedNetwork);
     
   } catch (error) {
     handleAnalysisError(error);
@@ -60,29 +65,34 @@ async function startAnalysis() {
 }
 
 /**
- * Perform the main wallet analysis
+ * Perform the main wallet analysis with network support
  */
-async function performAnalysis(wallets, tokens) {
+async function performAnalysis(wallets, tokens, network) {
   analysisInProgress = true;
   analysisStartTime = Date.now();
   
   try {
-    debugLog('🚀 Starting comprehensive wallet analysis');
+    const networkIcon = getNetworkIcon(network);
+    const networkName = getNetworkName(network);
+    
+    debugLog('🚀 Starting comprehensive multi-chain wallet analysis');
+    debugLog(`🌐 Selected Network: ${networkIcon} ${networkName}`);
     debugLog(`📊 Analyzing ${wallets.length} wallets for ${tokens.length} tokens`);
     
     // Initialize UI for analysis
     hideAllResults();
     showDebug(true);
-    showLoading(true, 0, 'Initializing blockchain analysis...');
+    showLoading(true, 0, `Initializing ${networkName} blockchain analysis...`);
     
     // Estimate analysis time
     const estimatedTime = calculateEstimatedTime(wallets.length, tokens.length);
     debugLog(`⏱️ Estimated completion time: ${estimatedTime}`);
     
     // Start the analysis
-    updateProgress(0, 100, 'Connecting to blockchain APIs...');
+    updateProgress(0, 100, `Connecting to ${networkName} APIs...`);
     
-    const result = await analyzeWallets(wallets, tokens);
+    // Pass network information to the analysis function
+    const result = await analyzeWallets(wallets, tokens, network);
     
     if (!result.success) {
       throw new Error(result.message || 'Analysis failed');
@@ -97,7 +107,10 @@ async function performAnalysis(wallets, tokens) {
       tokenCount: tokens.length,
       duration: formatDuration(duration),
       estimatedTime: estimatedTime,
-      actualTime: formatDuration(duration)
+      actualTime: formatDuration(duration),
+      network: network,
+      networkName: networkName,
+      networkIcon: networkIcon
     };
     
     // Display results with enhanced data
@@ -106,7 +119,7 @@ async function performAnalysis(wallets, tokens) {
     // Log success metrics
     logAnalysisMetrics(result.results, analysisData);
     
-    showToast('🎉 Analysis completed successfully!');
+    showToast(`🎉 ${networkName} analysis completed successfully!`);
     
   } catch (error) {
     throw error;
@@ -133,39 +146,57 @@ function handleAnalysisError(error) {
   analysisInProgress = false;
   showLoading(false);
   
-  debugLog(`❌ Analysis error: ${error.message}`, 'error');
+  const selectedNetwork = getSelectedNetwork();
+  const networkName = getNetworkName(selectedNetwork);
+  
+  debugLog(`❌ Analysis error on ${networkName}: ${error.message}`, 'error');
   
   // Categorize errors and provide helpful messages
-  let userMessage = 'Analysis failed. Please try again.';
+  let userMessage = `Analysis failed on ${networkName}. Please try again.`;
   let technicalDetails = error.message;
   
   if (error.message.includes('rate limit')) {
-    userMessage = 'Rate limit exceeded. Please wait a few minutes before trying again.';
+    userMessage = `Rate limit exceeded on ${networkName}. Please wait a few minutes before trying again.`;
   } else if (error.message.includes('network') || error.message.includes('fetch')) {
-    userMessage = 'Network error. Please check your internet connection and try again.';
+    userMessage = `Network error connecting to ${networkName}. Please check your internet connection and try again.`;
   } else if (error.message.includes('Invalid API')) {
-    userMessage = 'API configuration error. Please contact support.';
+    userMessage = `API configuration error for ${networkName}. Please contact support.`;
     technicalDetails = 'API key configuration issue';
   } else if (error.message.includes('timeout')) {
-    userMessage = 'Analysis timed out. Try reducing the number of wallets or tokens.';
+    userMessage = `Analysis timed out on ${networkName}. Try reducing the number of wallets or tokens.`;
   } else if (error.message.includes('400')) {
-    userMessage = 'Invalid request data. Please check your wallet and token addresses.';
+    userMessage = `Invalid request data for ${networkName}. Please check your wallet and token addresses.`;
   } else if (error.message.includes('500')) {
-    userMessage = 'Server error. Please try again in a few moments.';
+    userMessage = `Server error on ${networkName}. Please try again in a few moments.`;
+  } else if (error.message.includes('unsupported network')) {
+    userMessage = `${networkName} is not yet supported. Please select a different network.`;
   }
   
   showError(userMessage, technicalDetails);
 }
 
 /**
- * Calculate estimated analysis time
+ * Calculate estimated analysis time based on network
  */
 function calculateEstimatedTime(walletCount, tokenCount) {
-  // Base time calculation (approximate)
-  // ~1 second per wallet per token, plus overhead
-  const baseTimePerCheck = 1.2; // seconds
-  const overhead = 5; // seconds
+  const selectedNetwork = getSelectedNetwork();
   
+  // Base time calculation (varies by network)
+  let baseTimePerCheck = 1.2; // seconds
+  
+  // Adjust timing based on network characteristics
+  switch (selectedNetwork) {
+    case 'ethereum':
+      baseTimePerCheck = 1.2; // Ethereum mainnet - standard timing
+      break;
+    case 'base':
+      baseTimePerCheck = 0.8; // Base L2 - potentially faster
+      break;
+    default:
+      baseTimePerCheck = 1.5; // Unknown networks - conservative estimate
+  }
+  
+  const overhead = 5; // seconds
   const totalChecks = walletCount * tokenCount;
   const estimatedSeconds = (totalChecks * baseTimePerCheck) + overhead;
   
@@ -192,6 +223,8 @@ function formatDuration(ms) {
  */
 function logAnalysisMetrics(results, analysisData) {
   const metrics = {
+    network: analysisData.network,
+    networkName: analysisData.networkName,
     totalWallets: analysisData.walletCount,
     totalTokens: analysisData.tokenCount,
     perfectMatches: results.allTokens.length,
@@ -203,6 +236,7 @@ function logAnalysisMetrics(results, analysisData) {
   };
   
   debugLog('📈 Analysis Metrics:', 'success');
+  debugLog(`   Network: ${analysisData.networkIcon} ${metrics.networkName}`);
   debugLog(`   Wallets Analyzed: ${metrics.totalWallets}`);
   debugLog(`   Tokens Searched: ${metrics.totalTokens}`);
   debugLog(`   Perfect Matches: ${metrics.perfectMatches} (${(metrics.perfectMatches/metrics.totalWallets*100).toFixed(1)}%)`);
@@ -226,11 +260,18 @@ function performAdvancedValidation() {
   
   const wallets = parseAddressInput(walletsInput);
   const tokens = parseAddressInput(tokensInput);
+  const selectedNetwork = getSelectedNetwork();
+  const networkName = getNetworkName(selectedNetwork);
   
-  debugLog('🔍 Performing advanced validation...');
+  debugLog(`🔍 Performing advanced validation for ${networkName}...`);
   
   // Detailed validation
   const results = {
+    network: {
+      name: networkName,
+      value: selectedNetwork,
+      icon: getNetworkIcon(selectedNetwork)
+    },
     wallets: analyzeAddresses(wallets, 'wallet'),
     tokens: analyzeAddresses(tokens, 'token')
   };
@@ -301,10 +342,18 @@ function isSuspiciousAddress(address) {
 }
 
 /**
- * Show advanced validation results
+ * Show advanced validation results with network info
  */
 function showAdvancedValidationResults(results) {
   let content = '<h3>🔍 Advanced Validation Results</h3>';
+  
+  // Network information
+  content += `
+    <div class="validation-section">
+      <h4>🌐 Network Analysis</h4>
+      <p>Analysis will be performed on: <strong>${results.network.icon} ${results.network.name}</strong></p>
+    </div>
+  `;
   
   ['wallets', 'tokens'].forEach(type => {
     const data = results[type];
@@ -354,6 +403,55 @@ function showAdvancedValidationResults(results) {
 }
 
 /**
+ * Network-aware analysis function
+ * This function should be implemented to work with different blockchain networks
+ */
+async function analyzeWallets(wallets, tokens, network) {
+  // This is where the actual API call would be made
+  // The network parameter would be passed to the backend to determine
+  // which blockchain API to use (Etherscan for Ethereum, Basescan for Base, etc.)
+  
+  try {
+    debugLog(`🔗 Connecting to ${getNetworkName(network)} APIs...`);
+    
+    // Prepare request data with network information
+    const requestData = {
+      wallets: wallets,
+      tokens: tokens,
+      network: network,
+      networkName: getNetworkName(network)
+    };
+    
+    // Update progress
+    updateProgress(10, 100, `Preparing ${getNetworkName(network)} API requests...`);
+    
+    // Make API call to backend with network parameter
+    const response = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestData)
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    const result = await response.json();
+    
+    debugLog(`✅ Successfully received response from ${getNetworkName(network)} APIs`);
+    
+    return result;
+    
+  } catch (error) {
+    debugLog(`❌ Failed to analyze on ${getNetworkName(network)}: ${error.message}`, 'error');
+    throw error;
+  }
+}
+
+/**
  * Keyboard shortcut handlers
  */
 document.addEventListener('keydown', (event) => {
@@ -371,6 +469,15 @@ document.addEventListener('keydown', (event) => {
     performAdvancedValidation();
   }
   
+  // Ctrl/Cmd + Shift + N: Quick network switch
+  if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key === 'N') {
+    event.preventDefault();
+    const networkSelector = document.getElementById('network-selector');
+    if (networkSelector) {
+      networkSelector.focus();
+    }
+  }
+  
   // Escape: Cancel analysis or close modals
   if (event.key === 'Escape') {
     if (analysisInProgress) {
@@ -386,15 +493,35 @@ document.addEventListener('keydown', (event) => {
  * Initialize application on page load
  */
 document.addEventListener('DOMContentLoaded', () => {
-  debugLog('🚀 Ethereum Wallet Analyzer initialized');
+  debugLog('🚀 Wallet Analyzer initialized');
   debugLog('ℹ️ Keyboard shortcuts:');
   debugLog('   Ctrl+Enter: Start analysis');
   debugLog('   Ctrl+Shift+V: Advanced validation');
+  debugLog('   Ctrl+Shift+N: Focus network selector');
   debugLog('   Escape: Cancel/Close');
+  
+  // Check for supported networks
+  const supportedNetworks = ['ethereum', 'base'];
+  const currentNetwork = getSelectedNetwork();
+  
+  if (supportedNetworks.includes(currentNetwork)) {
+    debugLog(`🌐 Network ready: ${getNetworkIcon(currentNetwork)} ${getNetworkName(currentNetwork)}`);
+  } else {
+    debugLog(`⚠️ Unsupported network: ${currentNetwork}`, 'warning');
+  }
   
   // Initialize performance monitoring
   if ('performance' in window) {
     const loadTime = performance.now();
     debugLog(`⚡ Page loaded in ${loadTime.toFixed(2)}ms`);
+  }
+  
+  // Show welcome message for first-time users
+  const hasUsedBefore = localStorage.getItem('wallet-analyzer-used');
+  if (!hasUsedBefore) {
+    setTimeout(() => {
+      showToast('👋 Welcome to Wallet Analyzer! Select a network and start analyzing.', 5000);
+      localStorage.setItem('wallet-analyzer-used', 'true');
+    }, 1000);
   }
 });
