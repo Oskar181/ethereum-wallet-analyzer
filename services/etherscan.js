@@ -597,7 +597,99 @@ const legacyGetTokenDecimals = (tokenAddress) =>
 
 const legacyGetTokenInfo = (tokenAddress) => 
   getTokenInfo(tokenAddress, 'ethereum');
+/**
+ * Get multiple token information with pricing efficiently
+ * @param {Array} tokenAddresses - Array of token contract addresses
+ * @param {string} networkId - Network identifier
+ * @param {boolean} includePricing - Whether to include USD pricing
+ * @returns {Promise<Array>} Array of token info with pricing
+ */
+async function getMultipleTokenInfo(tokenAddresses, networkId = 'ethereum', includePricing = true) {
+  if (!Array.isArray(tokenAddresses) || tokenAddresses.length === 0) {
+    return [];
+  }
 
+  if (!isNetworkSupported(networkId)) {
+    throw new Error(`Unsupported network: ${networkId}`);
+  }
+  
+  const networkConfig = getNetworkConfig(networkId);
+  const timer = new PerformanceTimer(`Multiple Token Info - ${tokenAddresses.length} tokens on ${networkConfig.name}`);
+  
+  try {
+    logDebug(`Fetching multiple token info on ${networkConfig.name}`, {
+      tokenCount: tokenAddresses.length,
+      includePricing: includePricing,
+      network: networkConfig.name
+    });
+    
+    // Get all token info without pricing first
+    const tokenInfoPromises = tokenAddresses.map(address => 
+      getTokenInfo(address, networkId, false) // Don't include pricing yet
+    );
+    
+    const tokenInfos = await Promise.all(tokenInfoPromises);
+    
+    // If pricing is requested, fetch all prices in batches
+    if (includePricing) {
+      try {
+        const priceDataArray = await dexScreenerService.getMultipleTokenPrices(tokenAddresses, networkId);
+        
+        // Merge price data with token info
+        tokenInfos.forEach((tokenInfo, index) => {
+          const priceData = priceDataArray.find(p => 
+            p.address.toLowerCase() === tokenInfo.address.toLowerCase()
+          );
+          
+          if (priceData && !priceData.error) {
+            tokenInfo.priceUsd = priceData.priceUsd;
+            tokenInfo.priceChange24h = priceData.priceChange24h;
+            tokenInfo.volume24h = priceData.volume24h;
+            tokenInfo.dexId = priceData.dexId;
+            tokenInfo.pairAddress = priceData.pairAddress;
+            tokenInfo.priceSource = 'dexscreener';
+          } else {
+            tokenInfo.priceUsd = null;
+            tokenInfo.priceChange24h = null;
+            tokenInfo.priceSource = null;
+            tokenInfo.priceError = priceData?.error || 'Price data unavailable';
+          }
+        });
+        
+        const successfulPrices = tokenInfos.filter(t => t.priceUsd !== null).length;
+        logDebug(`Added price data to ${successfulPrices}/${tokenInfos.length} tokens`, {
+          network: networkConfig.name
+        });
+        
+      } catch (priceError) {
+        logError(`Failed to fetch batch price data for ${networkConfig.name}`, priceError);
+        
+        // Set all tokens to have no pricing data
+        tokenInfos.forEach(tokenInfo => {
+          tokenInfo.priceUsd = null;
+          tokenInfo.priceChange24h = null;
+          tokenInfo.priceSource = null;
+          tokenInfo.priceError = priceError.message;
+        });
+      }
+    }
+    
+    timer.end();
+    
+    logDebug(`Multiple token info completed for ${networkConfig.name}`, {
+      totalTokens: tokenInfos.length,
+      withPricing: includePricing,
+      network: networkConfig.name
+    });
+    
+    return tokenInfos;
+    
+  } catch (error) {
+    timer.end();
+    logError(`Failed to get multiple token info for ${networkConfig.name}`, error);
+    throw error;
+  }
+}
 module.exports = {
   // Multi-chain functions (with network parameter)
   getTokenBalance,
