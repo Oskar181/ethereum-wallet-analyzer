@@ -9,6 +9,46 @@ let analysisInProgress = false;
 let analysisStartTime = null;
 
 /**
+ * Parse address input from textarea and return clean array
+ */
+function parseAddressInput(input) {
+  if (!input || typeof input !== 'string') {
+    return [];
+  }
+  
+  return input
+    .split('\n')
+    .map(address => address.trim())
+    .filter(address => address.length > 0)
+    .filter(address => address !== '');
+}
+
+/**
+ * Validate Ethereum address format
+ */
+function isValidEthereumAddress(address) {
+  return /^0x[a-fA-F0-9]{40}$/.test(address);
+}
+
+/**
+ * Client-side address validation
+ */
+function validateAddressesClientSide(addresses) {
+  const valid = [];
+  const invalid = [];
+  
+  for (const address of addresses) {
+    if (isValidEthereumAddress(address)) {
+      valid.push(address);
+    } else {
+      invalid.push(address);
+    }
+  }
+  
+  return { valid, invalid };
+}
+
+/**
  * Main analysis function - entry point triggered by UI
  */
 async function startAnalysis() {
