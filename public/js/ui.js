@@ -1442,6 +1442,40 @@ document.addEventListener('keydown', (event) => {
       document.querySelectorAll('.modal-overlay').forEach(modal => modal.remove());
     }
   }
+/**
+ * Show explanation about Selected Tokens Value vs Total Portfolio Value
+ */
+function showPortfolioValueInfo() {
+  const helpContent = `
+    <h3>📊 Understanding Token Values</h3>
+    
+    <h4>🎯 Selected Tokens Value:</h4>
+    <p>This shows the <strong>total USD value</strong> of only the <strong>specific tokens</strong> you searched for that were found in the wallet.</p>
+    
+    <h4>💡 What this means:</h4>
+    <ul>
+      <li><strong>Not the complete portfolio</strong> - only your selected tokens</li>
+      <li><strong>Partial view</strong> - wallet may contain other valuable tokens</li>
+      <li><strong>Focused analysis</strong> - shows value of tokens you're interested in</li>
+    </ul>
+    
+    <h4>📈 Example:</h4>
+    <p>If you search for USDT and SHIB, and wallet has USDT ($500) + SHIB ($50) + ETH ($1000):</p>
+    <ul>
+      <li>✅ <strong>Selected Tokens Value: $550</strong> (USDT + SHIB only)</li>
+      <li>❌ <strong>Real Portfolio Value: $1,550</strong> (would include ETH too)</li>
+    </ul>
+    
+    <h4>🔍 For True Portfolio Analysis:</h4>
+    <p>To see the complete portfolio value, you would need to analyze ALL ERC-20 tokens in the wallet, not just specific ones.</p>
+  `;
+  
+  showModal('Token Values Explanation', helpContent);
+}
+
+// Make function globally available
+window.showPortfolioValueInfo = showPortfolioValueInfo;
+  
 });
 
 // Log enhanced shortcuts info
