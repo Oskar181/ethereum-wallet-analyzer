@@ -95,13 +95,88 @@ body {
 .app-header h1 {
     font-size: clamp(2rem, 5vw, 3rem);
     font-weight: 300;
-    margin-bottom: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
     text-shadow: 2px 2px 8px rgba(0,0,0,0.5);
     background: linear-gradient(135deg, var(--accent-green) 0%, var(--accent-green-light) 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
     animation: titleGlow 3s ease-in-out infinite alternate;
+}
+
+/* Network Selector Styles */
+.network-selector-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-md);
+    margin-top: var(--spacing-lg);
+    padding: var(--spacing-lg);
+    background: var(--card-bg);
+    border-radius: var(--radius-xl);
+    border: 1px solid var(--border-color);
+    backdrop-filter: blur(10px);
+    box-shadow: var(--shadow-sm);
+}
+
+.network-label {
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: 0 0 var(--spacing-sm) 0;
+    text-align: center;
+    width: 100%;
+    display: block;
+}
+
+.network-selector {
+    padding: var(--spacing-md) var(--spacing-lg);
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    background: rgba(20, 20, 35, 0.9);
+    color: var(--text-primary);
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-normal);
+    backdrop-filter: blur(10px);
+    min-width: 200px;
+    text-align: center;
+    outline: none;
+    font-family: var(--font-family);
+}
+
+.network-selector:hover {
+    border-color: var(--border-active);
+    box-shadow: 0 0 15px rgba(129, 199, 132, 0.3);
+    transform: translateY(-2px);
+}
+
+.network-selector:focus {
+    border-color: var(--accent-green);
+    box-shadow: 0 0 20px rgba(129, 199, 132, 0.4);
+    transform: translateY(-2px);
+}
+
+.network-selector option {
+    background: var(--card-bg);
+    color: var(--text-primary);
+    padding: var(--spacing-md);
+    font-weight: 500;
+}
+
+.network-selector option:hover {
+    background: var(--accent-green);
+    color: white;
+}
+
+/* Network indicator styling */
+.network-selector option[value="ethereum"]::before {
+    content: "🔷 ";
+}
+
+.network-selector option[value="base"]::before {
+    content: "🔵 ";
 }
 
 .app-subtitle {
@@ -1163,6 +1238,12 @@ body {
         grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
         gap: var(--spacing-md);
     }
+
+    .network-selector-container {
+        flex-direction: row;
+        gap: var(--spacing-md);
+        align-items: center;
+    }
 }
 
 @media (max-width: 768px) {
@@ -1173,6 +1254,16 @@ body {
     .container {
         padding: var(--spacing-lg);
         margin: 0;
+    }
+
+    .network-selector-container {
+        flex-direction: column;
+        gap: var(--spacing-md);
+        align-items: center;
+    }
+
+    .network-selector {
+        min-width: 100%;
     }
     
     .input-section {
@@ -1296,6 +1387,12 @@ body {
         right: var(--spacing-md);
         max-width: none;
     }
+
+    .network-selector {
+        min-width: unset;
+        width: 100%;
+        font-size: 0.9rem;
+    }
 }
 
 /* Accessibility Improvements */
@@ -1319,6 +1416,7 @@ body {
 /* Focus Indicators */
 button:focus-visible,
 textarea:focus-visible,
+select:focus-visible,
 .copy-btn:focus-visible,
 .tab-btn:focus-visible {
     outline: 2px solid var(--accent-green);
