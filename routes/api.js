@@ -2,6 +2,7 @@
  * API Routes for Multi-Chain Wallet Analyzer
  * Handles blockchain analysis requests for multiple networks
  * Supports Ethereum and Base networks
+ * POPRAWIONA WERSJA z USD pricing fix
  */
 
 const express = require('express');
@@ -10,10 +11,11 @@ const router = express.Router();
 const blockchainService = require('../services/etherscan');
 const dexScreenerService = require('../services/dexscreener');
 const { validateAddresses, parseAddressInput, validateRequestLimits } = require('../utils/helpers');
-const { logInfo, logError, PerformanceTimer } = require('../utils/debugger');
+const { logInfo, logError, logDebug, PerformanceTimer } = require('../utils/debugger');
 const { 
   API_CONFIG, 
   VALIDATION, 
+  ANALYSIS_CONFIG, // DODANE - potrzebne dla NETWORK_DELAYS
   isNetworkSupported, 
   getNetworkConfig, 
   getSupportedNetworks 
@@ -304,7 +306,8 @@ router.get('/health', (req, res) => {
         'POST /api/validate-addresses',
         'GET /api/token-info/:address?network=<network>',
         'GET /api/networks',
-        'GET /api/health'
+        'GET /api/health',
+        'POST /api/test-pricing'
       ]
     });
   } catch (error) {
@@ -315,6 +318,206 @@ router.get('/health', (req, res) => {
     });
   }
 });
+
+/**
+ * POST /api/test-pricing - NOWY ENDPOINT
+ * Test endpoint for USD pricing functionality
+ */
+router.post('/test-pricing', async (req, res) => {
+  const timer = new PerformanceTimer('USD Pricing Test');
+  
+  try {
+    const { tokens = [], network = 'ethereum' } = req.body;
+    
+    if (!Array.isArray(tokens) || tokens.length === 0) {
+      return res.status(400).json({
+        error: 'Invalid input',
+        message: 'Tokens array is required'
+      });
+    }
+    
+    if (!isNetworkSupported(network)) {
+      const supportedNetworks = getSupportedNetworks().map(n => n.id);
+      return res.status(400).json({
+        error: 'Unsupported network',
+        message: `Network '${network}' is not supported. Supported networks: ${supportedNetworks.join(', ')}`
+      });
+    }
+    
+    const networkConfig = getNetworkConfig(network);
+    
+    logInfo(`🧪 Starting USD pricing test on ${networkConfig.name}`, {
+      tokenCount: tokens.length,
+      tokens: tokens.map(t => t.substring(0, 10) + '...'),
+      network: network
+    });
+    
+    const results = [];
+    
+    // Test each token individually for detailed results
+    for (let i = 0; i < tokens.length; i++) {
+      const tokenAddress = tokens[i];
+      
+      try {
+        logInfo(`🔄 Testing token ${i + 1}/${tokens.length}: ${tokenAddress.substring(0, 10)}...`);
+        
+        // Test DexScreener service directly
+        const dexScreenerResult = await dexScreenerService.getTokenPrice(tokenAddress, network);
+        
+        // Test blockchain service with pricing
+        const blockchainResult = await blockchainService.getTokenInfo(tokenAddress, network, true);
+        
+        // Test USD calculation
+        let calculationTest = null;
+        if (dexScreenerResult.priceUsd && dexScreenerResult.priceUsd > 0) {
+          const testBalance = "1000.123456"; // Test with 1000 tokens
+          const calculatedUsd = dexScreenerService.calculateUsdValue(testBalance, dexScreenerResult.priceUsd);
+          const formattedUsd = dexScreenerService.formatUsdValue(calculatedUsd);
+          
+          calculationTest = {
+            testBalance: testBalance,
+            priceUsd: dexScreenerResult.priceUsd,
+            calculatedUsd: calculatedUsd,
+            formattedUsd: formattedUsd,
+            success: calculatedUsd > 0 && formattedUsd !== '$0.00'
+          };
+        }
+        
+        const testResult = {
+          tokenAddress: tokenAddress,
+          dexScreener: {
+            success: !dexScreenerResult.error && dexScreenerResult.priceUsd !== null,
+            priceUsd: dexScreenerResult.priceUsd,
+            priceChange24h: dexScreenerResult.priceChange24h,
+            source: dexScreenerResult.source,
+            error: dexScreenerResult.error || null
+          },
+          blockchain: {
+            success: !blockchainResult.priceError && blockchainResult.priceUsd !== null,
+            symbol: blockchainResult.symbol,
+            name: blockchainResult.name,
+            priceUsd: blockchainResult.priceUsd,
+            priceSource: blockchainResult.priceSource,
+            error: blockchainResult.priceError || null
+          },
+          calculation: calculationTest,
+          overall: {
+            success: (dexScreenerResult.priceUsd !== null || blockchainResult.priceUsd !== null) && 
+                     (!calculationTest || calculationTest.success),
+            hasPrice: dexScreenerResult.priceUsd !== null || blockchainResult.priceUsd !== null,
+            canCalculateUsd: calculationTest?.success || false
+          }
+        };
+        
+        results.push(testResult);
+        
+        logInfo(`${testResult.overall.success ? '✅' : '❌'} Token test completed: ${testResult.blockchain.symbol || 'Unknown'}`, {
+          hasPrice: testResult.overall.hasPrice,
+          canCalculate: testResult.overall.canCalculateUsd,
+          priceUsd: testResult.dexScreener.priceUsd || testResult.blockchain.priceUsd
+        });
+        
+      } catch (error) {
+        logError(`❌ Token test failed for ${tokenAddress}`, error);
+        
+        results.push({
+          tokenAddress: tokenAddress,
+          dexScreener: { success: false, error: error.message },
+          blockchain: { success: false, error: error.message },
+          calculation: null,
+          overall: { success: false, hasPrice: false, canCalculateUsd: false, error: error.message }
+        });
+      }
+      
+      // Add delay between tests
+      if (i < tokens.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+    
+    timer.end();
+    
+    // Calculate test summary
+    const summary = {
+      totalTests: results.length,
+      successful: results.filter(r => r.overall.success).length,
+      withPrices: results.filter(r => r.overall.hasPrice).length,
+      canCalculateUsd: results.filter(r => r.overall.canCalculateUsd).length,
+      dexScreenerSuccess: results.filter(r => r.dexScreener.success).length,
+      blockchainSuccess: results.filter(r => r.blockchain.success).length
+    };
+    
+    summary.successRate = ((summary.successful / summary.totalTests) * 100).toFixed(1);
+    summary.priceRate = ((summary.withPrices / summary.totalTests) * 100).toFixed(1);
+    
+    logInfo(`🎯 USD pricing test completed on ${networkConfig.name}`, {
+      ...summary,
+      network: network
+    });
+    
+    res.json({
+      success: true,
+      network: {
+        id: network,
+        name: networkConfig.name,
+        chainId: networkConfig.chainId
+      },
+      summary: summary,
+      results: results,
+      recommendations: generateTestRecommendations(summary, results)
+    });
+    
+  } catch (error) {
+    timer.end();
+    logError(`USD pricing test failed`, error);
+    
+    res.status(500).json({
+      error: 'Pricing test failed',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * Generate recommendations based on test results
+ */
+function generateTestRecommendations(summary, results) {
+  const recommendations = [];
+  
+  if (summary.successful === 0) {
+    recommendations.push('🔥 CRITICAL: No tokens returned USD prices. Check DexScreener API connectivity.');
+  } else if (summary.successRate < 50) {
+    recommendations.push('⚠️ WARNING: Low success rate. Consider adding backup price sources.');
+  } else if (summary.successRate < 80) {
+    recommendations.push('💡 INFO: Good success rate, but could be improved.');
+  } else {
+    recommendations.push('✅ EXCELLENT: High success rate for USD pricing.');
+  }
+  
+  if (summary.dexScreenerSuccess === 0) {
+    recommendations.push('🔧 Check DexScreener API - no successful calls detected.');
+  }
+  
+  if (summary.canCalculateUsd < summary.withPrices) {
+    recommendations.push('🧮 USD calculation issues detected - check calculateUsdValue function.');
+  }
+  
+  // Check for specific error patterns
+  const commonErrors = {};
+  results.forEach(result => {
+    if (result.dexScreener.error) {
+      commonErrors[result.dexScreener.error] = (commonErrors[result.dexScreener.error] || 0) + 1;
+    }
+  });
+  
+  Object.entries(commonErrors).forEach(([error, count]) => {
+    if (count > 1) {
+      recommendations.push(`🔍 Recurring error (${count}x): ${error}`);
+    }
+  });
+  
+  return recommendations;
+}
 
 /**
  * Core analysis function with network support
@@ -402,14 +605,14 @@ async function analyzeWalletsForTokens(wallets, tokens, network, requestId = 'un
 }
 
 /**
- * Analyze individual wallet for target tokens on specific network
+ * Analyze individual wallet for target tokens on specific network - POPRAWIONA WERSJA
  */
 async function analyzeWallet(walletAddress, targetTokens, network, requestId) {
   const networkConfig = getNetworkConfig(network);
   const walletTimer = new PerformanceTimer(`Wallet Analysis: ${walletAddress.substring(0, 10)}-${networkConfig.name}`);
   
   try {
-    logInfo(`Starting wallet analysis on ${networkConfig.name}`, {
+    logInfo(`🔄 Starting wallet analysis on ${networkConfig.name}`, {
       requestId,
       walletAddress: walletAddress.substring(0, 20) + '...',
       tokenCount: targetTokens.length,
@@ -417,35 +620,66 @@ async function analyzeWallet(walletAddress, targetTokens, network, requestId) {
       networkName: networkConfig.name
     });
     
+    // Step 1: Get token balances
     const balanceResults = await blockchainService.getMultipleTokenBalances(
       walletAddress, 
       targetTokens, 
       network
     );
     
-    // Get token information with pricing for tokens that have balances
+    logDebug(`📊 Balance results for wallet ${walletAddress.substring(0, 10)}...`, {
+      totalTokens: balanceResults.length,
+      tokensWithBalance: balanceResults.filter(r => r.hasBalance).length,
+      tokensWithErrors: balanceResults.filter(r => r.error).length,
+      network: networkConfig.name
+    });
+    
+    // Step 2: Get token information with pricing for tokens that have balances
     const tokensWithBalances = balanceResults.filter(result => result.hasBalance && !result.error);
     const tokenAddresses = tokensWithBalances.map(result => result.tokenAddress);
+    
+    logDebug(`💰 Fetching pricing for ${tokenAddresses.length} tokens with balances`, {
+      tokenAddresses: tokenAddresses.map(addr => addr.substring(0, 10) + '...'),
+      network: networkConfig.name
+    });
     
     let tokenInfos = [];
     if (tokenAddresses.length > 0) {
       try {
+        logDebug(`🔄 Calling getMultipleTokenInfo with pricing=true`);
         tokenInfos = await blockchainService.getMultipleTokenInfo(tokenAddresses, network, true);
+        
+        logDebug(`✅ Received token info for ${tokenInfos.length} tokens`, {
+          tokensWithPrices: tokenInfos.filter(t => t.priceUsd !== null && t.priceUsd > 0).length,
+          tokensWithErrors: tokenInfos.filter(t => t.priceError).length,
+          network: networkConfig.name
+        });
+        
       } catch (error) {
-        logError(`Failed to get token info with pricing on ${networkConfig.name}`, error, {
+        logError(`❌ Failed to get token info with pricing on ${networkConfig.name}`, error, {
           requestId,
           tokenCount: tokenAddresses.length,
           network: network
         });
         
         // Fallback: get token info without pricing
-        tokenInfos = await Promise.all(
-          tokenAddresses.map(address => blockchainService.getTokenInfo(address, network, false))
-        );
+        logDebug(`🔄 Falling back to token info without pricing`);
+        try {
+          tokenInfos = await Promise.all(
+            tokenAddresses.map(address => blockchainService.getTokenInfo(address, network, false))
+          );
+          logDebug(`✅ Fallback token info received for ${tokenInfos.length} tokens`);
+        } catch (fallbackError) {
+          logError(`❌ Even fallback token info failed`, fallbackError);
+          tokenInfos = [];
+        }
       }
     }
     
+    // Step 3: Build found tokens array with USD calculations
     const foundTokens = [];
+    
+    logDebug(`🔨 Building foundTokens array from ${tokensWithBalances.length} balance results`);
     
     for (const balanceData of tokensWithBalances) {
       const tokenInfo = tokenInfos.find(info => 
@@ -457,12 +691,43 @@ async function analyzeWallet(walletAddress, targetTokens, network, requestId) {
         let usdValue = null;
         let usdValueFormatted = null;
         
-        if (tokenInfo.priceUsd && balanceData.balance) {
-          usdValue = dexScreenerService.calculateUsdValue(balanceData.balance, tokenInfo.priceUsd);
-          usdValueFormatted = dexScreenerService.formatUsdValue(usdValue);
+        logDebug(`💵 Processing token ${tokenInfo.symbol}`, {
+          address: tokenInfo.address.substring(0, 10) + '...',
+          balance: balanceData.balance,
+          priceUsd: tokenInfo.priceUsd,
+          priceSource: tokenInfo.priceSource,
+          priceError: tokenInfo.priceError
+        });
+        
+        if (tokenInfo.priceUsd && tokenInfo.priceUsd > 0 && balanceData.balance) {
+          try {
+            usdValue = dexScreenerService.calculateUsdValue(balanceData.balance, tokenInfo.priceUsd);
+            usdValueFormatted = dexScreenerService.formatUsdValue(usdValue);
+            
+            logDebug(`✅ USD calculation successful for ${tokenInfo.symbol}`, {
+              balance: balanceData.balance,
+              priceUsd: tokenInfo.priceUsd,
+              usdValue: usdValue,
+              usdValueFormatted: usdValueFormatted
+            });
+          } catch (calcError) {
+            logError(`❌ USD calculation failed for ${tokenInfo.symbol}`, calcError, {
+              balance: balanceData.balance,
+              priceUsd: tokenInfo.priceUsd
+            });
+            usdValue = null;
+            usdValueFormatted = null;
+          }
+        } else {
+          logDebug(`⚠️ No USD calculation for ${tokenInfo.symbol}`, {
+            hasPrice: !!tokenInfo.priceUsd,
+            priceValue: tokenInfo.priceUsd,
+            hasBalance: !!balanceData.balance,
+            priceError: tokenInfo.priceError
+          });
         }
         
-        foundTokens.push({
+        const tokenResult = {
           address: balanceData.tokenAddress,
           balance: balanceData.balance,
           symbol: tokenInfo.symbol,
@@ -477,8 +742,13 @@ async function analyzeWallet(walletAddress, targetTokens, network, requestId) {
           usdValueFormatted: usdValueFormatted,
           priceSource: tokenInfo.priceSource,
           priceError: tokenInfo.priceError
-        });
+        };
+        
+        foundTokens.push(tokenResult);
+        
       } else {
+        logDebug(`⚠️ No token info found for ${balanceData.tokenAddress.substring(0, 10)}...`);
+        
         // Add token with basic info even if we can't get details
         foundTokens.push({
           address: balanceData.tokenAddress,
@@ -502,7 +772,8 @@ async function analyzeWallet(walletAddress, targetTokens, network, requestId) {
     
     // Calculate total portfolio value
     const totalUsdValue = foundTokens.reduce((total, token) => {
-      return total + (token.usdValue || 0);
+      const tokenUsdValue = token.usdValue || 0;
+      return total + tokenUsdValue;
     }, 0);
     
     const result = {
@@ -514,12 +785,14 @@ async function analyzeWallet(walletAddress, targetTokens, network, requestId) {
       totalUsdValueFormatted: dexScreenerService.formatUsdValue(totalUsdValue)
     };
     
-    logInfo(`Wallet analysis completed on ${networkConfig.name}`, {
+    logInfo(`✅ Wallet analysis completed on ${networkConfig.name}`, {
       requestId,
       walletAddress: walletAddress.substring(0, 10) + '...',
       tokensChecked: targetTokens.length,
       tokensFound: foundTokens.length,
+      tokensWithUsdValue: foundTokens.filter(t => t.usdValue && t.usdValue > 0).length,
       totalUsdValue: totalUsdValue,
+      totalUsdValueFormatted: result.totalUsdValueFormatted,
       foundSymbols: foundTokens.map(t => t.symbol).join(', '),
       network: network,
       networkName: networkConfig.name
@@ -529,7 +802,7 @@ async function analyzeWallet(walletAddress, targetTokens, network, requestId) {
     
   } catch (error) {
     walletTimer.end();
-    logError(`Wallet analysis failed on ${networkConfig.name}`, error, {
+    logError(`❌ Wallet analysis failed on ${networkConfig.name}`, error, {
       requestId,
       walletAddress: walletAddress.substring(0, 10) + '...',
       network: network
