@@ -112,11 +112,6 @@ body {
     gap: var(--spacing-md);
     margin-top: var(--spacing-lg);
     padding: var(--spacing-lg);
-    background: var(--card-bg);
-    border-radius: var(--radius-xl);
-    border: 1px solid var(--border-color);
-    backdrop-filter: blur(10px);
-    box-shadow: var(--shadow-sm);
 }
 
 .network-label {
