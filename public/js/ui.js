@@ -612,7 +612,20 @@ function populateCategoryResults(category, wallets, totalTokens = 0) {
                     <span class="token-name">${token.name}</span>
                   </div>
                   <div class="token-balance">
-                    ${token.balance} ${token.symbol}
+                    <div class="balance-amount">${token.balance} ${token.symbol}</div>
+                    ${token.usdValueFormatted ? `
+                      <div class="balance-usd">${token.usdValueFormatted}</div>
+                    ` : ''}
+                    ${token.priceUsd ? `
+                      <div class="token-price">
+                        ${parseFloat(token.priceUsd).toFixed(token.priceUsd < 0.01 ? 6 : 4)}
+                        ${token.priceChange24h ? `
+                          <span class="price-change ${token.priceChange24h >= 0 ? 'positive' : 'negative'}">
+                            ${token.priceChange24h >= 0 ? '+' : ''}${token.priceChange24h.toFixed(2)}%
+                          </span>
+                        ` : ''}
+                      </div>
+                    ` : ''}
                   </div>
                 </div>
                 <div class="token-address">
@@ -621,9 +634,19 @@ function populateCategoryResults(category, wallets, totalTokens = 0) {
                     📋
                   </button>
                 </div>
+                ${token.priceSource ? `
+                  <div class="price-source">
+                    <small>Price from ${token.priceSource}</small>
+                  </div>
+                ` : ''}
               </div>
             `).join('')}
           </div>
+          ${wallet.totalUsdValueFormatted && wallet.totalUsdValue > 0 ? `
+            <div class="wallet-total-value">
+              <strong>Total Portfolio Value: ${wallet.totalUsdValueFormatted}</strong>
+            </div>
+          ` : ''}
         ` : category !== 'none' ? `
           <div class="no-tokens-found">
             <span class="info-icon">ℹ️</span>
