@@ -1,6 +1,7 @@
 /**
  * UI Layer - Handles all user interface interactions and state management
  * Enhanced with professional animations and user experience features
+ * POPRAWIONA WERSJA z USD pricing debugging
  */
 
 // Global UI state
@@ -528,10 +529,10 @@ function displayResults(results, analysisData) {
   // Update tab counts
   updateTabCounts(allCount, someCount, noneCount);
   
-  // Populate category results
-  populateCategoryResults('all', results.allTokens, analysisData?.tokenCount);
-  populateCategoryResults('some', results.someTokens, analysisData?.tokenCount);
-  populateCategoryResults('none', results.noTokens, analysisData?.tokenCount);
+  // Populate category results - USING ENHANCED VERSION
+  populateCategoryResultsWithDebug('all', results.allTokens, analysisData?.tokenCount);
+  populateCategoryResultsWithDebug('some', results.someTokens, analysisData?.tokenCount);
+  populateCategoryResultsWithDebug('none', results.noTokens, analysisData?.tokenCount);
   
   // Show results section
   resultsSection.style.display = 'block';
@@ -557,9 +558,147 @@ function updateTabCounts(allCount, someCount, noneCount) {
 }
 
 /**
- * Populate category results
+ * ENHANCED TOKEN ITEM with USD debugging info - NOWA FUNKCJA
  */
-function populateCategoryResults(category, wallets, totalTokens = 0) {
+function createTokenItemHTML(token) {
+  const hasPriceData = token.priceUsd !== null && token.priceUsd !== undefined;
+  const hasUsdValue = token.usdValueFormatted && token.usdValue > 0;
+  
+  // Debug information for pricing
+  const debugInfo = `
+    <!-- Pricing Debug Info -->
+    <!-- Price USD: ${token.priceUsd} -->
+    <!-- USD Value: ${token.usdValue} -->
+    <!-- USD Formatted: ${token.usdValueFormatted} -->
+    <!-- Price Source: ${token.priceSource} -->
+    <!-- Price Error: ${token.priceError} -->
+    <!-- Balance: ${token.balance} -->
+  `;
+  
+  return `
+    <div class="token-item">
+      ${debugInfo}
+      <div class="token-header">
+        <div class="token-info">
+          <span class="token-symbol">${token.symbol}</span>
+          <span class="token-name">${token.name}</span>
+        </div>
+        <div class="token-balance">
+          <div class="balance-amount">${token.balance} ${token.symbol}</div>
+          ${hasUsdValue ? `
+            <div class="balance-usd" style="color: #4caf50; font-weight: bold;">${token.usdValueFormatted}</div>
+          ` : ''}
+          ${hasPriceData && !hasUsdValue ? `
+            <div class="balance-usd-error" style="color: #ff9800; font-size: 0.8rem;">
+              Price: $${parseFloat(token.priceUsd).toFixed(6)} (calc error)
+            </div>
+          ` : ''}
+          ${!hasPriceData && token.priceError ? `
+            <div class="balance-usd-error" style="color: #f44336; font-size: 0.8rem;">
+              No price data
+            </div>
+          ` : ''}
+          ${token.priceUsd && hasPriceData ? `
+            <div class="token-price">
+              $${parseFloat(token.priceUsd).toFixed(token.priceUsd < 0.01 ? 6 : 4)}
+              ${token.priceChange24h ? `
+                <span class="price-change ${token.priceChange24h >= 0 ? 'positive' : 'negative'}">
+                  ${token.priceChange24h >= 0 ? '+' : ''}${token.priceChange24h.toFixed(2)}%
+                </span>
+              ` : ''}
+            </div>
+          ` : ''}
+        </div>
+      </div>
+      <div class="token-address">
+        <code>${token.address}</code>
+        <button class="copy-btn" data-copy="${token.address}" title="Copy token address">
+          📋
+        </button>
+      </div>
+      ${token.priceSource ? `
+        <div class="price-source">
+          <small>Price from ${token.priceSource}</small>
+        </div>
+      ` : ''}
+      ${token.priceError ? `
+        <div class="price-error" style="color: #f44336; font-size: 0.75rem; font-style: italic;">
+          ⚠️ ${token.priceError}
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+/**
+ * ENHANCED WALLET RESULT with USD debugging - NOWA FUNKCJA
+ */
+function createWalletResultHTML(wallet, category, totalTokens) {
+  const foundCount = wallet.foundTokens?.length || 0;
+  const statusClass = getWalletStatusClass(category);
+  const statusText = getWalletStatusText(category, foundCount, totalTokens);
+  
+  // Calculate USD totals with debug info
+  const tokensWithUsd = wallet.foundTokens?.filter(t => t.usdValue && t.usdValue > 0) || [];
+  const tokensWithPrices = wallet.foundTokens?.filter(t => t.priceUsd && t.priceUsd > 0) || [];
+  const tokensWithErrors = wallet.foundTokens?.filter(t => t.priceError) || [];
+  
+  return `
+    <div class="wallet-result ${statusClass}" data-wallet="${wallet.walletAddress}">
+      <div class="wallet-header">
+        <div class="wallet-address">
+          <span class="wallet-icon">📁</span>
+          <code class="address-text">${wallet.walletAddress}</code>
+          <button class="copy-btn" data-copy="${wallet.walletAddress}" title="Copy address">
+            📋
+          </button>
+        </div>
+        <div class="wallet-status ${statusClass}">
+          ${statusText}
+        </div>
+      </div>
+      
+      <!-- USD DEBUG INFO -->
+      <div class="usd-debug-info" style="background: rgba(66, 165, 245, 0.1); padding: 8px; border-radius: 4px; margin: 8px 0; font-size: 0.8rem;">
+        💰 USD Debug: ${tokensWithUsd.length}/${foundCount} tokens have USD values | 
+        📊 ${tokensWithPrices.length} have prices | 
+        ${tokensWithErrors.length > 0 ? `⚠️ ${tokensWithErrors.length} price errors` : '✅ No price errors'}
+      </div>
+      
+      ${wallet.error ? `
+        <div class="wallet-error">
+          <span class="error-icon">⚠️</span>
+          <span class="error-text">${wallet.error}</span>
+        </div>
+      ` : ''}
+      
+      ${wallet.foundTokens && wallet.foundTokens.length > 0 ? `
+        <div class="token-list">
+          ${wallet.foundTokens.map(token => createTokenItemHTML(token)).join('')}
+        </div>
+        ${wallet.totalUsdValueFormatted && wallet.totalUsdValue > 0 ? `
+          <div class="wallet-total-value">
+            <strong>💰 Total Portfolio Value: ${wallet.totalUsdValueFormatted}</strong>
+          </div>
+        ` : `
+          <div class="wallet-total-value" style="color: #ff9800;">
+            ⚠️ Total Portfolio Value: Unable to calculate (missing price data)
+          </div>
+        `}
+      ` : category !== 'none' ? `
+        <div class="no-tokens-found">
+          <span class="info-icon">ℹ️</span>
+          <span>No matching tokens found in this wallet</span>
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+/**
+ * ENHANCED populateCategoryResults with debugging - POPRAWIONA WERSJA
+ */
+function populateCategoryResultsWithDebug(category, wallets, totalTokens = 0) {
   const resultsDiv = document.getElementById(`results-${category}`);
   if (!resultsDiv) return;
   
@@ -573,88 +712,42 @@ function populateCategoryResults(category, wallets, totalTokens = 0) {
     return;
   }
   
-  let html = '';
+  // Debug summary - calculate totals for debugging
+  const totalTokensWithPrices = wallets.reduce((sum, wallet) => {
+    return sum + (wallet.foundTokens?.filter(t => t.priceUsd && t.priceUsd > 0).length || 0);
+  }, 0);
   
-  wallets.forEach((wallet, index) => {
-    const foundCount = wallet.foundTokens?.length || 0;
-    const statusClass = getWalletStatusClass(category);
-    const statusText = getWalletStatusText(category, foundCount, totalTokens);
-    
-    html += `
-      <div class="wallet-result ${statusClass}" data-wallet="${wallet.walletAddress}">
-        <div class="wallet-header">
-          <div class="wallet-address">
-            <span class="wallet-icon">📁</span>
-            <code class="address-text">${wallet.walletAddress}</code>
-            <button class="copy-btn" data-copy="${wallet.walletAddress}" title="Copy address">
-              📋
-            </button>
-          </div>
-          <div class="wallet-status ${statusClass}">
-            ${statusText}
-          </div>
-        </div>
-        
-        ${wallet.error ? `
-          <div class="wallet-error">
-            <span class="error-icon">⚠️</span>
-            <span class="error-text">${wallet.error}</span>
-          </div>
-        ` : ''}
-        
-        ${wallet.foundTokens && wallet.foundTokens.length > 0 ? `
-          <div class="token-list">
-            ${wallet.foundTokens.map(token => `
-              <div class="token-item">
-                <div class="token-header">
-                  <div class="token-info">
-                    <span class="token-symbol">${token.symbol}</span>
-                    <span class="token-name">${token.name}</span>
-                  </div>
-                  <div class="token-balance">
-                    <div class="balance-amount">${token.balance} ${token.symbol}</div>
-                    ${token.usdValueFormatted ? `
-                      <div class="balance-usd">${token.usdValueFormatted}</div>
-                    ` : ''}
-                    ${token.priceUsd ? `
-                      <div class="token-price">
-                        ${parseFloat(token.priceUsd).toFixed(token.priceUsd < 0.01 ? 6 : 4)}
-                        ${token.priceChange24h ? `
-                          <span class="price-change ${token.priceChange24h >= 0 ? 'positive' : 'negative'}">
-                            ${token.priceChange24h >= 0 ? '+' : ''}${token.priceChange24h.toFixed(2)}%
-                          </span>
-                        ` : ''}
-                      </div>
-                    ` : ''}
-                  </div>
-                </div>
-                <div class="token-address">
-                  <code>${token.address}</code>
-                  <button class="copy-btn" data-copy="${token.address}" title="Copy token address">
-                    📋
-                  </button>
-                </div>
-                ${token.priceSource ? `
-                  <div class="price-source">
-                    <small>Price from ${token.priceSource}</small>
-                  </div>
-                ` : ''}
-              </div>
-            `).join('')}
-          </div>
-          ${wallet.totalUsdValueFormatted && wallet.totalUsdValue > 0 ? `
-            <div class="wallet-total-value">
-              <strong>Total Portfolio Value: ${wallet.totalUsdValueFormatted}</strong>
-            </div>
-          ` : ''}
-        ` : category !== 'none' ? `
-          <div class="no-tokens-found">
-            <span class="info-icon">ℹ️</span>
-            <span>No matching tokens found in this wallet</span>
-          </div>
-        ` : ''}
+  const totalTokensWithUsdValues = wallets.reduce((sum, wallet) => {
+    return sum + (wallet.foundTokens?.filter(t => t.usdValue && t.usdValue > 0).length || 0);
+  }, 0);
+  
+  const totalUsdValue = wallets.reduce((sum, wallet) => {
+    return sum + (wallet.totalUsdValue || 0);
+  }, 0);
+  
+  // Create USD value formatter (simplified version for UI)
+  const formatUsdValue = (value) => {
+    if (!value || value === 0) return '$0.00';
+    if (value < 1000) return `$${value.toFixed(2)}`;
+    if (value < 1000000) return `$${(value / 1000).toFixed(2)}K`;
+    return `$${(value / 1000000).toFixed(2)}M`;
+  };
+  
+  let html = `
+    <div class="category-debug-summary" style="background: rgba(129, 199, 132, 0.1); padding: 12px; border-radius: 8px; margin-bottom: 16px;">
+      <h4 style="color: #4caf50; margin: 0 0 8px 0;">📊 USD Pricing Summary for ${category.toUpperCase()} category:</h4>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; font-size: 0.9rem;">
+        <div>💰 Total USD Value: <strong>${formatUsdValue(totalUsdValue)}</strong></div>
+        <div>📊 Tokens with prices: <strong>${totalTokensWithPrices}</strong></div>
+        <div>💵 Tokens with USD values: <strong>${totalTokensWithUsdValues}</strong></div>
+        <div>📈 Success rate: <strong>${totalTokensWithPrices > 0 ? ((totalTokensWithUsdValues/totalTokensWithPrices)*100).toFixed(1) : 0}%</strong></div>
       </div>
-    `;
+    </div>
+  `;
+  
+  // Add wallet results
+  wallets.forEach((wallet, index) => {
+    html += createWalletResultHTML(wallet, category, totalTokens);
   });
   
   resultsDiv.innerHTML = html;
@@ -667,6 +760,17 @@ function populateCategoryResults(category, wallets, totalTokens = 0) {
       copyToClipboard(text);
     });
   });
+  
+  // Log debug info
+  debugLog(`🎯 Category ${category}: ${wallets.length} wallets, $${totalUsdValue.toFixed(2)} total value`);
+}
+
+/**
+ * LEGACY populateCategoryResults for backward compatibility
+ */
+function populateCategoryResults(category, wallets, totalTokens = 0) {
+  // Use the enhanced version
+  populateCategoryResultsWithDebug(category, wallets, totalTokens);
 }
 
 /**
@@ -1050,10 +1154,12 @@ function showHelp() {
     <h4>💡 Tips:</h4>
     <ul>
       <li>Use Ctrl+Enter to quickly start analysis</li>
+      <li>Use Ctrl+Shift+T to test USD pricing</li>
       <li>Maximum 50 wallets and 20 tokens per analysis</li>
       <li>Analysis may take 1-2 minutes for large datasets</li>
       <li>Results can be exported as JSON or shared</li>
       <li>Network selection is saved automatically</li>
+      <li>USD pricing debug info shows in results</li>
     </ul>
   `;
   
@@ -1091,7 +1197,150 @@ function showModal(title, content) {
   });
 }
 
-// Make UI functions globally available
+// =====================================================================
+// ENHANCED USD PRICING DEBUGGING FUNCTIONS - DODANE
+// =====================================================================
+
+/**
+ * Test USD pricing functionality - NOWA FUNKCJA
+ */
+async function testUsdPricing() {
+  debugLog('🧪 Testing USD pricing functionality...', 'info');
+  
+  const testTokens = [
+    '0xdac17f958d2ee523a2206206994597c13d831ec7', // USDT
+    '0x95ad61b0a150d79219dcf64e1e6cc01f0b64c4ce', // SHIB
+    '0x2260fac5e5542a773aa44fbcfedf7c193bc2c599'  // WBTC
+  ];
+  
+  const selectedNetwork = getSelectedNetwork();
+  
+  try {
+    debugLog(`🔄 Testing price fetch for ${testTokens.length} tokens on ${getNetworkName(selectedNetwork)}`);
+    
+    const response = await fetch('/api/test-pricing', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        tokens: testTokens,
+        network: selectedNetwork
+      })
+    });
+    
+    if (response.ok) {
+      const result = await response.json();
+      debugLog('✅ USD pricing test successful', 'success');
+      debugLog(`📊 Test Results Summary:`, 'info');
+      debugLog(`   • Success Rate: ${result.summary.successRate}%`, 'info');
+      debugLog(`   • Tokens with Prices: ${result.summary.withPrices}/${result.summary.totalTests}`, 'info');
+      debugLog(`   • Can Calculate USD: ${result.summary.canCalculateUsd}`, 'info');
+      debugLog(`   • DexScreener Success: ${result.summary.dexScreenerSuccess}`, 'info');
+      
+      // Show recommendations
+      if (result.recommendations && result.recommendations.length > 0) {
+        debugLog('💡 Recommendations:', 'info');
+        result.recommendations.forEach(rec => debugLog(`   ${rec}`, 'info'));
+      }
+      
+      // Show detailed results for first few tokens
+      if (result.results && result.results.length > 0) {
+        debugLog('🔍 Detailed Results (first 3):', 'debug');
+        result.results.slice(0, 3).forEach((tokenResult, i) => {
+          debugLog(`   Token ${i + 1}: ${tokenResult.blockchain.symbol || 'Unknown'}`, 'debug');
+          debugLog(`     Price USD: ${tokenResult.dexScreener.priceUsd || 'N/A'}`, 'debug');
+          debugLog(`     Source: ${tokenResult.dexScreener.source || 'N/A'}`, 'debug');
+          debugLog(`     Overall Success: ${tokenResult.overall.success ? '✅' : '❌'}`, 'debug');
+        });
+      }
+      
+      showToast('🧪 USD Pricing Test Complete - Check Debug Console');
+      
+    } else {
+      debugLog('❌ USD pricing test failed', 'error');
+      debugLog(`Response: ${response.status} ${response.statusText}`, 'error');
+      showToast('❌ USD Pricing Test Failed', 5000);
+    }
+  } catch (error) {
+    debugLog(`❌ USD pricing test error: ${error.message}`, 'error');
+    showToast('❌ USD Pricing Test Error', 5000);
+  }
+}
+
+/**
+ * Quick USD debugging function - NOWA FUNKCJA
+ */
+function debugUsdPricing() {
+  if (!currentResults) {
+    debugLog('⚠️ No current results to debug', 'warning');
+    showToast('No analysis results to debug');
+    return;
+  }
+  
+  debugLog('🔍 USD Pricing Debug Analysis', 'info');
+  
+  const allWallets = [
+    ...currentResults.allTokens,
+    ...currentResults.someTokens,
+    ...currentResults.noTokens
+  ];
+  
+  let totalTokens = 0;
+  let tokensWithPrices = 0;
+  let tokensWithUsdValues = 0;
+  let totalUsdValue = 0;
+  
+  allWallets.forEach(wallet => {
+    if (wallet.foundTokens) {
+      wallet.foundTokens.forEach(token => {
+        totalTokens++;
+        if (token.priceUsd && token.priceUsd > 0) tokensWithPrices++;
+        if (token.usdValue && token.usdValue > 0) {
+          tokensWithUsdValues++;
+          totalUsdValue += token.usdValue;
+        }
+      });
+    }
+  });
+  
+  debugLog(`📊 USD Debug Summary:`, 'info');
+  debugLog(`   • Total Tokens: ${totalTokens}`, 'info');
+  debugLog(`   • Tokens with Prices: ${tokensWithPrices} (${(tokensWithPrices/totalTokens*100).toFixed(1)}%)`, 'info');
+  debugLog(`   • Tokens with USD Values: ${tokensWithUsdValues} (${(tokensWithUsdValues/totalTokens*100).toFixed(1)}%)`, 'info');
+  debugLog(`   • Total USD Value: $${totalUsdValue.toFixed(2)}`, 'info');
+  debugLog(`   • Price → USD Conversion Rate: ${tokensWithPrices > 0 ? (tokensWithUsdValues/tokensWithPrices*100).toFixed(1) : 0}%`, 'info');
+  
+  // Find tokens with price errors
+  const tokensWithErrors = [];
+  allWallets.forEach(wallet => {
+    if (wallet.foundTokens) {
+      wallet.foundTokens.forEach(token => {
+        if (token.priceError) {
+          tokensWithErrors.push({
+            symbol: token.symbol,
+            error: token.priceError,
+            wallet: wallet.walletAddress.substring(0, 10) + '...'
+          });
+        }
+      });
+    }
+  });
+  
+  if (tokensWithErrors.length > 0) {
+    debugLog(`⚠️ Tokens with Price Errors (${tokensWithErrors.length}):`, 'warning');
+    tokensWithErrors.slice(0, 5).forEach(token => {
+      debugLog(`   • ${token.symbol}: ${token.error}`, 'warning');
+    });
+    if (tokensWithErrors.length > 5) {
+      debugLog(`   ... and ${tokensWithErrors.length - 5} more`, 'warning');
+    }
+  }
+  
+  showToast(`🔍 USD Debug Complete - ${tokensWithUsdValues}/${totalTokens} tokens have USD values`);
+}
+
+// Make functions globally available
 window.debugLog = debugLog;
 window.showError = showError;
 window.hideError = hideError;
@@ -1105,6 +1354,13 @@ window.showModal = showModal;
 window.getSelectedNetwork = getSelectedNetwork;
 window.getNetworkName = getNetworkName;
 window.getNetworkIcon = getNetworkIcon;
+
+// ENHANCED USD PRICING FUNCTIONS - DODANE DO WINDOW
+window.testUsdPricing = testUsdPricing;
+window.debugUsdPricing = debugUsdPricing;
+window.populateCategoryResultsWithDebug = populateCategoryResultsWithDebug;
+window.createTokenItemHTML = createTokenItemHTML;
+window.createWalletResultHTML = createWalletResultHTML;
 
 /**
  * Utility function for debouncing
@@ -1120,3 +1376,64 @@ function debounce(func, wait) {
     timeout = setTimeout(later, wait);
   };
 }
+
+// =====================================================================
+// ENHANCED KEYBOARD SHORTCUTS - ROZSZERZONE
+// =====================================================================
+
+document.addEventListener('keydown', (event) => {
+  // Ctrl/Cmd + Enter: Start analysis
+  if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+    event.preventDefault();
+    if (!analysisInProgress && typeof startAnalysis === 'function') {
+      startAnalysis();
+    }
+  }
+  
+  // Ctrl/Cmd + Shift + V: Advanced validation
+  if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key === 'V') {
+    event.preventDefault();
+    if (typeof performAdvancedValidation === 'function') {
+      performAdvancedValidation();
+    }
+  }
+  
+  // Ctrl/Cmd + Shift + T: Test USD pricing - NOWE
+  if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key === 'T') {
+    event.preventDefault();
+    testUsdPricing();
+  }
+  
+  // Ctrl/Cmd + Shift + D: Debug USD pricing - NOWE
+  if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key === 'D') {
+    event.preventDefault();
+    debugUsdPricing();
+  }
+  
+  // Ctrl/Cmd + Shift + N: Quick network switch
+  if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key === 'N') {
+    event.preventDefault();
+    const networkSelector = document.getElementById('network-selector');
+    if (networkSelector) {
+      networkSelector.focus();
+    }
+  }
+  
+  // Escape: Cancel analysis or close modals
+  if (event.key === 'Escape') {
+    if (analysisInProgress) {
+      // Could implement cancellation here
+    } else {
+      // Close any open modals
+      document.querySelectorAll('.modal-overlay').forEach(modal => modal.remove());
+    }
+  }
+});
+
+// Log enhanced shortcuts info
+debugLog('💰 Enhanced USD pricing debugging loaded. Shortcuts:', 'info');
+debugLog('   • Ctrl+Shift+T: Test USD pricing', 'info');
+debugLog('   • Ctrl+Shift+D: Debug current USD results', 'info');
+debugLog('   • Ctrl+Enter: Start analysis', 'info');
+debugLog('   • Ctrl+Shift+V: Advanced validation', 'info');
+debugLog('   • Ctrl+Shift+N: Focus network selector', 'info');
