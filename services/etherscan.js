@@ -15,6 +15,7 @@ const {
 } = require('../config/constants');
 const { weiToTokens, retryWithBackoff, isValidEthereumAddress } = require('../utils/helpers');
 const { logDebug, logError, PerformanceTimer } = require('../utils/debugger');
+const dexScreenerService = require('./dexscreener');
 
 /**
  * Base API call function with retry logic for any network
@@ -361,9 +362,9 @@ async function getTokenDecimals(tokenAddress, networkId = 'ethereum') {
 }
 
 /**
- * Get comprehensive token information on specified network
+ * Get comprehensive token information on specified network with USD pricing
  */
-async function getTokenInfo(tokenAddress, networkId = 'ethereum') {
+async function getTokenInfo(tokenAddress, networkId = 'ethereum', includePricing = true) {
   if (!isValidEthereumAddress(tokenAddress)) {
     throw new Error('Invalid token address');
   }
@@ -377,56 +378,202 @@ async function getTokenInfo(tokenAddress, networkId = 'ethereum') {
   
   // Check network-specific database first
   const tokenDatabase = getTokenDatabase(networkId);
+  let tokenInfo;
+  
   if (tokenDatabase[lowerAddress]) {
     logDebug(`Token found in ${networkConfig.name} database: ${tokenDatabase[lowerAddress].symbol}`);
-    return {
+    tokenInfo = {
       address: tokenAddress,
       ...tokenDatabase[lowerAddress],
       source: 'database',
       network: networkId,
       networkName: networkConfig.name
     };
-  }
-  
-  // Try to get info from contract
-  try {
-    const [name, symbol, decimals] = await Promise.all([
-      getTokenName(tokenAddress, networkId),
-      getTokenSymbol(tokenAddress, networkId),
-      getTokenDecimals(tokenAddress, networkId)
-    ]);
-    
-    if (symbol || name) {
-      const tokenInfo = {
+  } else {
+    // Try to get info from contract
+    try {
+      const [name, symbol, decimals] = await Promise.all([
+        getTokenName(tokenAddress, networkId),
+        getTokenSymbol(tokenAddress, networkId),
+        getTokenDecimals(tokenAddress, networkId)
+      ]);
+      
+      if (symbol || name) {
+        tokenInfo = {
+          address: tokenAddress,
+          symbol: symbol || `Token_${tokenAddress.substring(0, 6)}...`,
+          name: name || `Token: ${tokenAddress.substring(0, 10)}...${tokenAddress.slice(-4)}`,
+          decimals: decimals,
+          source: 'contract',
+          network: networkId,
+          networkName: networkConfig.name
+        };
+        
+        logDebug(`Token info retrieved from ${networkConfig.name} contract`, tokenInfo);
+      } else {
+        // Fallback to basic info
+        tokenInfo = {
+          address: tokenAddress,
+          symbol: `${tokenAddress.substring(0, 6)}...`,
+          name: `Token: ${tokenAddress.substring(0, 10)}...${tokenAddress.slice(-4)}`,
+          decimals: ANALYSIS_CONFIG.DEFAULT_DECIMALS,
+          source: 'fallback',
+          network: networkId,
+          networkName: networkConfig.name
+        };
+      }
+    } catch (error) {
+      logDebug(`Failed to get token info from ${networkConfig.name} contract`, { 
+        error: error.message,
+        network: networkConfig.name 
+      });
+      
+      // Fallback to basic info
+      tokenInfo = {
         address: tokenAddress,
-        symbol: symbol || `Token_${tokenAddress.substring(0, 6)}...`,
-        name: name || `Token: ${tokenAddress.substring(0, 10)}...${tokenAddress.slice(-4)}`,
-        decimals: decimals,
-        source: 'contract',
+        symbol: `${tokenAddress.substring(0, 6)}...`,
+        name: `Token: ${tokenAddress.substring(0, 10)}...${tokenAddress.slice(-4)}`,
+        decimals: ANALYSIS_CONFIG.DEFAULT_DECIMALS,
+        source: 'fallback',
         network: networkId,
         networkName: networkConfig.name
       };
-      
-      logDebug(`Token info retrieved from ${networkConfig.name} contract`, tokenInfo);
-      return tokenInfo;
     }
-  } catch (error) {
-    logDebug(`Failed to get token info from ${networkConfig.name} contract`, { 
-      error: error.message,
-      network: networkConfig.name 
-    });
   }
   
-  // Fallback to basic info
-  return {
-    address: tokenAddress,
-    symbol: `${tokenAddress.substring(0, 6)}...`,
-    name: `Token: ${tokenAddress.substring(0, 10)}...${tokenAddress.slice(-4)}`,
-    decimals: ANALYSIS_CONFIG.DEFAULT_DECIMALS,
-    source: 'fallback',
-    network: networkId,
-    networkName: networkConfig.name
-  };
+  // Add pricing information from DexScreener if requested
+  if (includePricing) {
+    try {
+      const priceData = await dexScreenerService.getTokenPrice(tokenAddress, networkId);
+      
+      if (priceData && !priceData.error) {
+        tokenInfo.priceUsd = priceData.priceUsd;
+        tokenInfo.priceChange24h = priceData.priceChange24h;
+        tokenInfo.volume24h = priceData.volume24h;
+        tokenInfo.dexId = priceData.dexId;
+        tokenInfo.pairAddress = priceData.pairAddress;
+        tokenInfo.priceSource = 'dexscreener';
+        
+        logDebug(`Added price data to token info for ${tokenInfo.symbol}`, {
+          priceUsd: tokenInfo.priceUsd,
+          priceChange24h: tokenInfo.priceChange24h,
+          network: networkConfig.name
+        });
+      } else {
+        tokenInfo.priceUsd = null;
+        tokenInfo.priceChange24h = null;
+        tokenInfo.priceSource = null;
+        tokenInfo.priceError = priceData?.error || 'Price data unavailable';
+        
+        logDebug(`Failed to get price data for ${tokenInfo.symbol}`, {
+          error: priceData?.error,
+          network: networkConfig.name
+        });
+      }
+    } catch (priceError) {
+      logError(`Failed to fetch price data for token ${tokenAddress} on ${networkConfig.name}`, priceError);
+      tokenInfo.priceUsd = null;
+      tokenInfo.priceChange24h = null;
+      tokenInfo.priceSource = null;
+      tokenInfo.priceError = priceError.message;
+    }
+  }
+  
+  return tokenInfo;
+}
+
+/**
+ * Get multiple token information with pricing efficiently
+ * @param {Array} tokenAddresses - Array of token contract addresses
+ * @param {string} networkId - Network identifier
+ * @param {boolean} includePricing - Whether to include USD pricing
+ * @returns {Promise<Array>} Array of token info with pricing
+ */
+async function getMultipleTokenInfo(tokenAddresses, networkId = 'ethereum', includePricing = true) {
+  if (!Array.isArray(tokenAddresses) || tokenAddresses.length === 0) {
+    return [];
+  }
+
+  if (!isNetworkSupported(networkId)) {
+    throw new Error(`Unsupported network: ${networkId}`);
+  }
+  
+  const networkConfig = getNetworkConfig(networkId);
+  const timer = new PerformanceTimer(`Multiple Token Info - ${tokenAddresses.length} tokens on ${networkConfig.name}`);
+  
+  try {
+    logDebug(`Fetching multiple token info on ${networkConfig.name}`, {
+      tokenCount: tokenAddresses.length,
+      includePricing: includePricing,
+      network: networkConfig.name
+    });
+    
+    // Get all token info without pricing first
+    const tokenInfoPromises = tokenAddresses.map(address => 
+      getTokenInfo(address, networkId, false) // Don't include pricing yet
+    );
+    
+    const tokenInfos = await Promise.all(tokenInfoPromises);
+    
+    // If pricing is requested, fetch all prices in batches
+    if (includePricing) {
+      try {
+        const priceDataArray = await dexScreenerService.getMultipleTokenPrices(tokenAddresses, networkId);
+        
+        // Merge price data with token info
+        tokenInfos.forEach((tokenInfo, index) => {
+          const priceData = priceDataArray.find(p => 
+            p.address.toLowerCase() === tokenInfo.address.toLowerCase()
+          );
+          
+          if (priceData && !priceData.error) {
+            tokenInfo.priceUsd = priceData.priceUsd;
+            tokenInfo.priceChange24h = priceData.priceChange24h;
+            tokenInfo.volume24h = priceData.volume24h;
+            tokenInfo.dexId = priceData.dexId;
+            tokenInfo.pairAddress = priceData.pairAddress;
+            tokenInfo.priceSource = 'dexscreener';
+          } else {
+            tokenInfo.priceUsd = null;
+            tokenInfo.priceChange24h = null;
+            tokenInfo.priceSource = null;
+            tokenInfo.priceError = priceData?.error || 'Price data unavailable';
+          }
+        });
+        
+        const successfulPrices = tokenInfos.filter(t => t.priceUsd !== null).length;
+        logDebug(`Added price data to ${successfulPrices}/${tokenInfos.length} tokens`, {
+          network: networkConfig.name
+        });
+        
+      } catch (priceError) {
+        logError(`Failed to fetch batch price data for ${networkConfig.name}`, priceError);
+        
+        // Set all tokens to have no pricing data
+        tokenInfos.forEach(tokenInfo => {
+          tokenInfo.priceUsd = null;
+          tokenInfo.priceChange24h = null;
+          tokenInfo.priceSource = null;
+          tokenInfo.priceError = priceError.message;
+        });
+      }
+    }
+    
+    timer.end();
+    
+    logDebug(`Multiple token info completed for ${networkConfig.name}`, {
+      totalTokens: tokenInfos.length,
+      withPricing: includePricing,
+      network: networkConfig.name
+    });
+    
+    return tokenInfos;
+    
+  } catch (error) {
+    timer.end();
+    logError(`Failed to get multiple token info for ${networkConfig.name}`, error);
+    throw error;
+  }
 }
 
 // Legacy functions for backward compatibility (default to Ethereum)
@@ -460,6 +607,7 @@ module.exports = {
   getTokenSymbol,
   getTokenDecimals,
   getTokenInfo,
+  getMultipleTokenInfo,
   
   // Legacy functions for backward compatibility (Ethereum only)
   getTokenBalanceLegacy: legacyGetTokenBalance,
