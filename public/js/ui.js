@@ -7,6 +7,7 @@
 let currentResults = null;
 let currentCategory = 'all';
 let debugDiv;
+let selectedNetwork = 'ethereum'; // Default network
 
 /**
  * Initialize UI when DOM is loaded
@@ -42,8 +43,9 @@ function initializeUI() {
     debugToggle.textContent = 'Show';
   }
   
-  // Load saved inputs from localStorage
+  // Load saved inputs and network from localStorage
   loadSavedInputs();
+  loadSavedNetwork();
   
   debugLog('UI initialized successfully');
 }
@@ -55,6 +57,7 @@ function setupEventListeners() {
   // Input change listeners for real-time validation
   const walletsInput = document.getElementById('wallets');
   const tokensInput = document.getElementById('tokens');
+  const networkSelector = document.getElementById('network-selector');
   
   if (walletsInput) {
     walletsInput.addEventListener('input', debounce(handleWalletsInput, 300));
@@ -64,6 +67,11 @@ function setupEventListeners() {
   if (tokensInput) {
     tokensInput.addEventListener('input', debounce(handleTokensInput, 300));
     tokensInput.addEventListener('paste', handlePasteEvent);
+  }
+
+  // Network selector change listener
+  if (networkSelector) {
+    networkSelector.addEventListener('change', handleNetworkChange);
   }
   
   // Main action buttons
@@ -97,6 +105,61 @@ function setupEventListeners() {
   window.addEventListener('resize', debounce(handleWindowResize, 250));
   
   debugLog('Event listeners setup completed');
+}
+
+/**
+ * Handle network selector change
+ */
+function handleNetworkChange(event) {
+  const newNetwork = event.target.value;
+  selectedNetwork = newNetwork;
+  
+  // Save to localStorage
+  saveNetworkToStorage();
+  
+  // Update UI feedback
+  const networkIcon = getNetworkIcon(newNetwork);
+  const networkName = getNetworkName(newNetwork);
+  
+  debugLog(`🌐 Network changed to: ${networkIcon} ${networkName}`, 'info');
+  
+  // Show toast notification
+  showToast(`🌐 Switched to ${networkName}`);
+  
+  // Clear previous results when switching networks
+  if (currentResults) {
+    hideAllResults();
+    debugLog('Previous results cleared due to network change', 'info');
+  }
+}
+
+/**
+ * Get network icon for display
+ */
+function getNetworkIcon(network) {
+  const icons = {
+    'ethereum': '🔷',
+    'base': '🔵'
+  };
+  return icons[network] || '🌐';
+}
+
+/**
+ * Get network display name
+ */
+function getNetworkName(network) {
+  const names = {
+    'ethereum': 'Ethereum Mainnet',
+    'base': 'Base Mainnet'
+  };
+  return names[network] || 'Unknown Network';
+}
+
+/**
+ * Get currently selected network
+ */
+function getSelectedNetwork() {
+  return selectedNetwork;
 }
 
 /**
@@ -301,35 +364,6 @@ function showDebug(show = true) {
 }
 
 /**
-/**
- * ✅ NAPRAWIONY Toggle debug panel visibility - ukrywa tylko zawartość
- */
-function toggleDebug() {
-  const debugContent = document.getElementById('debug-content');
-  const debugToggle = document.getElementById('debug-toggle');
-  const debugPanel = document.getElementById('debug');
-  
-  if (debugContent && debugToggle && debugPanel) {
-    // Upewnij się że panel jest widoczny (żeby header był zawsze dostępny)
-    debugPanel.style.display = 'block';
-    
-    const isContentVisible = debugContent.style.display !== 'none';
-    
-    if (isContentVisible) {
-      // Hide debug content (but keep header visible)
-      debugContent.style.display = 'none';
-      debugToggle.textContent = 'Show'; // ✅ Zmiana tekstu na "Show"
-      debugLog('Debug console content hidden', 'info');
-    } else {
-      // Show debug content
-      debugContent.style.display = 'block';
-      debugToggle.textContent = 'Hide'; // ✅ Zmiana tekstu na "Hide"
-      debugLog('Debug console content shown', 'info');
-    }
-  }
-}
-
-/**
  * Show/hide loading indicator with progress
  */
 function showLoading(show = true, progress = 0, details = '') {
@@ -380,9 +414,10 @@ function showLoading(show = true, progress = 0, details = '') {
  */
 function updateProgress(current, total, currentItem = '') {
   const progress = total > 0 ? (current / total) * 100 : 0;
+  const networkName = getNetworkName(selectedNetwork);
   const details = currentItem 
-    ? `Processing ${current}/${total}: ${currentItem}...`
-    : `Processing ${current}/${total}...`;
+    ? `Analyzing on ${networkName}: ${current}/${total} - ${currentItem}...`
+    : `Processing on ${networkName}: ${current}/${total}...`;
   
   showLoading(true, progress, details);
 }
@@ -446,6 +481,10 @@ function displayResults(results, analysisData) {
   const totalWallets = allCount + someCount + noneCount;
   const successRate = totalWallets > 0 ? ((allCount + someCount) / totalWallets * 100).toFixed(1) : 0;
   
+  // Get network info for display
+  const networkIcon = getNetworkIcon(selectedNetwork);
+  const networkName = getNetworkName(selectedNetwork);
+  
   // Update statistics grid
   statsDiv.innerHTML = `
     <div class="stat-card perfect-match">
@@ -482,7 +521,7 @@ function displayResults(results, analysisData) {
       <div class="stat-icon">⏱️</div>
       <div class="stat-number">${analysisData?.duration || 'N/A'}</div>
       <div class="stat-label">Analysis Time</div>
-      <div class="stat-sublabel">Duration</div>
+      <div class="stat-sublabel">on ${networkIcon} ${networkName}</div>
     </div>
   `;
   
@@ -501,7 +540,7 @@ function displayResults(results, analysisData) {
   // Show the active category
   showCategory(currentCategory);
   
-  debugLog(`Results displayed: ${totalWallets} wallets analyzed`, 'success');
+  debugLog(`Results displayed: ${totalWallets} wallets analyzed on ${networkName}`, 'success');
 }
 
 /**
@@ -694,7 +733,17 @@ function showValidationResults(walletValidation, tokenValidation) {
   
   if (!validationSection || !validationContent) return;
   
+  const networkName = getNetworkName(selectedNetwork);
+  
   let html = '';
+  
+  // Network info
+  html += `
+    <div class="validation-group">
+      <h4>🌐 Selected Network</h4>
+      <p>Analysis will be performed on: <strong>${networkName}</strong></p>
+    </div>
+  `;
   
   // Wallet validation results
   html += `
@@ -770,17 +819,25 @@ function saveInputsToStorage() {
     const wallets = document.getElementById('wallets').value;
     const tokens = document.getElementById('tokens').value;
     
-    localStorage.setItem('ethereum-analyzer-wallets', wallets);
-    localStorage.setItem('ethereum-analyzer-tokens', tokens);
+    localStorage.setItem('wallet-analyzer-wallets', wallets);
+    localStorage.setItem('wallet-analyzer-tokens', tokens);
   } catch (error) {
     debugLog('Failed to save inputs to storage', 'warning');
   }
 }
 
+function saveNetworkToStorage() {
+  try {
+    localStorage.setItem('wallet-analyzer-network', selectedNetwork);
+  } catch (error) {
+    debugLog('Failed to save network to storage', 'warning');
+  }
+}
+
 function loadSavedInputs() {
   try {
-    const savedWallets = localStorage.getItem('ethereum-analyzer-wallets');
-    const savedTokens = localStorage.getItem('ethereum-analyzer-tokens');
+    const savedWallets = localStorage.getItem('wallet-analyzer-wallets');
+    const savedTokens = localStorage.getItem('wallet-analyzer-tokens');
     
     if (savedWallets) {
       document.getElementById('wallets').value = savedWallets;
@@ -796,10 +853,27 @@ function loadSavedInputs() {
   }
 }
 
+function loadSavedNetwork() {
+  try {
+    const savedNetwork = localStorage.getItem('wallet-analyzer-network');
+    if (savedNetwork) {
+      selectedNetwork = savedNetwork;
+      const networkSelector = document.getElementById('network-selector');
+      if (networkSelector) {
+        networkSelector.value = savedNetwork;
+      }
+      debugLog(`Loaded saved network: ${getNetworkName(savedNetwork)}`, 'info');
+    }
+  } catch (error) {
+    debugLog('Failed to load saved network', 'warning');
+  }
+}
+
 function clearStorage() {
   try {
-    localStorage.removeItem('ethereum-analyzer-wallets');
-    localStorage.removeItem('ethereum-analyzer-tokens');
+    localStorage.removeItem('wallet-analyzer-wallets');
+    localStorage.removeItem('wallet-analyzer-tokens');
+    localStorage.removeItem('wallet-analyzer-network');
   } catch (error) {
     debugLog('Failed to clear storage', 'warning');
   }
@@ -854,6 +928,11 @@ function exportResults() {
   
   const data = {
     timestamp: new Date().toISOString(),
+    network: {
+      name: getNetworkName(selectedNetwork),
+      value: selectedNetwork,
+      icon: getNetworkIcon(selectedNetwork)
+    },
     analysis: {
       totalWallets: currentResults.allTokens.length + currentResults.someTokens.length + currentResults.noTokens.length,
       perfectMatch: currentResults.allTokens.length,
@@ -868,7 +947,7 @@ function exportResults() {
   
   const a = document.createElement('a');
   a.href = url;
-  a.download = `ethereum-wallet-analysis-${Date.now()}.json`;
+  a.download = `wallet-analysis-${selectedNetwork}-${Date.now()}.json`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -888,9 +967,11 @@ function shareResults() {
     return;
   }
   
+  const networkName = getNetworkName(selectedNetwork);
+  
   const shareData = {
-    title: 'Ethereum Wallet Analysis Results',
-    text: `Found ${currentResults.allTokens.length} perfect matches, ${currentResults.someTokens.length} partial matches, and ${currentResults.noTokens.length} empty wallets.`,
+    title: 'Multi-Chain Wallet Analysis Results',
+    text: `Found ${currentResults.allTokens.length} perfect matches, ${currentResults.someTokens.length} partial matches, and ${currentResults.noTokens.length} empty wallets on ${networkName}.`,
     url: window.location.href
   };
   
@@ -914,14 +995,21 @@ function fallbackShare(shareData) {
  */
 function showHelp() {
   const helpContent = `
-    <h3>🔍 How to Use Ethereum Wallet Analyzer</h3>
+    <h3>🔍 How to Use Wallet Analyzer</h3>
     <ol>
-      <li><strong>Add Wallet Addresses:</strong> Enter Ethereum wallet addresses (0x...) one per line in the left textarea</li>
-      <li><strong>Add Token Addresses:</strong> Enter ERC-20 token contract addresses one per line in the right textarea</li>
+      <li><strong>Select Network:</strong> Choose the blockchain network (Ethereum or Base) for analysis</li>
+      <li><strong>Add Wallet Addresses:</strong> Enter wallet addresses (0x...) one per line in the left textarea</li>
+      <li><strong>Add Token Addresses:</strong> Enter token contract addresses one per line in the right textarea</li>
       <li><strong>Validate (Optional):</strong> Click "Validate Addresses" to check for format errors</li>
       <li><strong>Analyze:</strong> Click "Analyze Wallets" to start the blockchain analysis</li>
       <li><strong>View Results:</strong> Results are categorized into ALL/SOME/NO tokens found</li>
     </ol>
+    
+    <h4>🌐 Supported Networks:</h4>
+    <ul>
+      <li><strong>🔷 Ethereum Mainnet:</strong> The original Ethereum blockchain</li>
+      <li><strong>🔵 Base Mainnet:</strong> Coinbase's Layer 2 solution built on Optimism</li>
+    </ul>
     
     <h4>💡 Tips:</h4>
     <ul>
@@ -929,6 +1017,7 @@ function showHelp() {
       <li>Maximum 50 wallets and 20 tokens per analysis</li>
       <li>Analysis may take 1-2 minutes for large datasets</li>
       <li>Results can be exported as JSON or shared</li>
+      <li>Network selection is saved automatically</li>
     </ul>
   `;
   
