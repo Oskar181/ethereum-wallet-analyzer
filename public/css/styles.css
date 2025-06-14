@@ -877,11 +877,51 @@ body {
 }
 
 .token-balance {
+    text-align: right;
+    font-family: var(--font-mono);
+    min-width: 0;
+}
+
+.balance-amount {
     color: var(--accent-green);
     font-weight: 600;
     font-size: 1rem;
-    text-align: right;
-    font-family: var(--font-mono);
+    margin-bottom: var(--spacing-xs);
+}
+
+.balance-usd {
+    color: var(--text-primary);
+    font-weight: 700;
+    font-size: 1.1rem;
+    margin-bottom: var(--spacing-xs);
+}
+
+.token-price {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    justify-content: flex-end;
+    flex-wrap: wrap;
+}
+
+.price-change {
+    font-weight: 600;
+    font-size: 0.8rem;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: var(--radius-sm);
+    white-space: nowrap;
+}
+
+.price-change.positive {
+    color: var(--accent-green);
+    background: rgba(76, 175, 80, 0.1);
+}
+
+.price-change.negative {
+    color: var(--accent-red);
+    background: rgba(244, 67, 54, 0.1);
 }
 
 .token-address {
@@ -894,6 +934,7 @@ body {
     font-family: var(--font-mono);
     font-size: 0.8rem;
     color: var(--text-muted);
+    margin-top: var(--spacing-sm);
 }
 
 .token-address code {
@@ -901,6 +942,29 @@ body {
     word-break: break-all;
     background: none;
     color: inherit;
+}
+
+.price-source {
+    margin-top: var(--spacing-sm);
+    text-align: right;
+    opacity: 0.7;
+}
+
+.price-source small {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-style: italic;
+}
+
+.wallet-total-value {
+    margin-top: var(--spacing-lg);
+    padding: var(--spacing-md);
+    background: linear-gradient(135deg, rgba(129, 199, 132, 0.1), rgba(76, 175, 80, 0.1));
+    border: 1px solid rgba(129, 199, 132, 0.3);
+    border-radius: var(--radius-md);
+    text-align: center;
+    color: var(--accent-green);
+    font-size: 1.1rem;
 }
 
 /* Empty States */
@@ -1320,6 +1384,22 @@ body {
     
     .token-balance {
         text-align: left;
+        width: 100%;
+    }
+    
+    .token-price {
+        justify-content: flex-start;
+        flex-wrap: wrap;
+        gap: var(--spacing-sm);
+    }
+    
+    .price-change {
+        margin-top: var(--spacing-xs);
+    }
+    
+    .wallet-total-value {
+        font-size: 1rem;
+        padding: var(--spacing-sm);
     }
     
     .category-tabs {
