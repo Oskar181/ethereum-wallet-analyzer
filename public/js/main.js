@@ -105,6 +105,21 @@ async function startAnalysis() {
 }
 
 /**
+ * Validate inputs function
+ */
+function validateInputs() {
+  const walletsInput = document.getElementById('wallets').value.trim();
+  const tokensInput = document.getElementById('tokens').value.trim();
+  
+  if (!walletsInput || !tokensInput) {
+    showError('Please provide both wallet and token addresses');
+    return false;
+  }
+  
+  return true;
+}
+
+/**
  * Perform the main wallet analysis with network support
  */
 async function performAnalysis(wallets, tokens, network) {
@@ -444,13 +459,9 @@ function showAdvancedValidationResults(results) {
 
 /**
  * Network-aware analysis function
- * This function should be implemented to work with different blockchain networks
+ * This function makes API calls to the backend
  */
 async function analyzeWallets(wallets, tokens, network) {
-  // This is where the actual API call would be made
-  // The network parameter would be passed to the backend to determine
-  // which blockchain API to use (Etherscan for Ethereum, Basescan for Base, etc.)
-  
   try {
     debugLog(`🔗 Connecting to ${getNetworkName(network)} APIs...`);
     
@@ -529,9 +540,51 @@ document.addEventListener('keydown', (event) => {
   }
 });
 
+// Make functions globally available
+window.parseAddressInput = parseAddressInput;
+window.isValidEthereumAddress = isValidEthereumAddress;
+window.validateAddressesClientSide = validateAddressesClientSide;
+window.startAnalysis = startAnalysis;
+window.validateInputs = validateInputs;
+window.analyzeWallets = analyzeWallets;
+window.performAdvancedValidation = performAdvancedValidation;
+
 /**
  * Initialize application on page load
  */
+document.addEventListener('DOMContentLoaded', () => {
+  debugLog('🚀 Wallet Analyzer initialized');
+  debugLog('ℹ️ Keyboard shortcuts:');
+  debugLog('   Ctrl+Enter: Start analysis');
+  debugLog('   Ctrl+Shift+V: Advanced validation');
+  debugLog('   Ctrl+Shift+N: Focus network selector');
+  debugLog('   Escape: Cancel/Close');
+  
+  // Check for supported networks
+  const supportedNetworks = ['ethereum', 'base'];
+  const currentNetwork = getSelectedNetwork();
+  
+  if (supportedNetworks.includes(currentNetwork)) {
+    debugLog(`🌐 Network ready: ${getNetworkIcon(currentNetwork)} ${getNetworkName(currentNetwork)}`);
+  } else {
+    debugLog(`⚠️ Unsupported network: ${currentNetwork}`, 'warning');
+  }
+  
+  // Initialize performance monitoring
+  if ('performance' in window) {
+    const loadTime = performance.now();
+    debugLog(`⚡ Page loaded in ${loadTime.toFixed(2)}ms`);
+  }
+  
+  // Show welcome message for first-time users
+  const hasUsedBefore = localStorage.getItem('wallet-analyzer-used');
+  if (!hasUsedBefore) {
+    setTimeout(() => {
+      showToast('👋 Welcome to Wallet Analyzer! Select a network and start analyzing.', 5000);
+      localStorage.setItem('wallet-analyzer-used', 'true');
+    }, 1000);
+  }
+});
 document.addEventListener('DOMContentLoaded', () => {
   debugLog('🚀 Wallet Analyzer initialized');
   debugLog('ℹ️ Keyboard shortcuts:');
