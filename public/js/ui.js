@@ -82,7 +82,7 @@ function setupEventListeners() {
   const retryBtn = document.getElementById('retry-btn');
   
   if (analyzeBtn) analyzeBtn.addEventListener('click', startAnalysis);
-  if (validateBtn) validateBtn.addEventListener('click', validateInputs);
+  if (validateBtn) validateBtn.addEventListener('click', validateInputsUI);
   if (clearBtn) clearBtn.addEventListener('click', clearInputs);
   if (debugToggle) debugToggle.addEventListener('click', toggleDebug);
   if (retryBtn) retryBtn.addEventListener('click', retryAnalysis);
@@ -704,7 +704,7 @@ function getWalletStatusText(category, foundCount, totalTokens) {
 /**
  * Validation and input handling functions
  */
-function validateInputs() {
+function validateInputsUI() {
   const walletsInput = document.getElementById('wallets').value.trim();
   const tokensInput = document.getElementById('tokens').value.trim();
   
@@ -792,8 +792,12 @@ function showValidationResults(walletValidation, tokenValidation) {
  * Utility functions
  */
 function clearInputs() {
-  document.getElementById('wallets').value = '';
-  document.getElementById('tokens').value = '';
+  const walletsEl = document.getElementById('wallets');
+  const tokensEl = document.getElementById('tokens');
+  
+  if (walletsEl) walletsEl.value = '';
+  if (tokensEl) tokensEl.value = '';
+  
   updateInputCounters();
   hideAllResults();
   clearStorage();
@@ -816,13 +820,17 @@ function retryAnalysis() {
  */
 function saveInputsToStorage() {
   try {
-    const wallets = document.getElementById('wallets').value;
-    const tokens = document.getElementById('tokens').value;
+    const walletsEl = document.getElementById('wallets');
+    const tokensEl = document.getElementById('tokens');
     
-    localStorage.setItem('wallet-analyzer-wallets', wallets);
-    localStorage.setItem('wallet-analyzer-tokens', tokens);
+    if (walletsEl) {
+      localStorage.setItem('wallet-analyzer-wallets', walletsEl.value);
+    }
+    if (tokensEl) {
+      localStorage.setItem('wallet-analyzer-tokens', tokensEl.value);
+    }
   } catch (error) {
-    debugLog('Failed to save inputs to storage', 'warning');
+    debugLog('Failed to save inputs to storage: ' + error.message, 'warning');
   }
 }
 
@@ -830,7 +838,7 @@ function saveNetworkToStorage() {
   try {
     localStorage.setItem('wallet-analyzer-network', selectedNetwork);
   } catch (error) {
-    debugLog('Failed to save network to storage', 'warning');
+    debugLog('Failed to save network to storage: ' + error.message, 'warning');
   }
 }
 
@@ -839,17 +847,21 @@ function loadSavedInputs() {
     const savedWallets = localStorage.getItem('wallet-analyzer-wallets');
     const savedTokens = localStorage.getItem('wallet-analyzer-tokens');
     
-    if (savedWallets) {
-      document.getElementById('wallets').value = savedWallets;
+    const walletsEl = document.getElementById('wallets');
+    const tokensEl = document.getElementById('tokens');
+    
+    if (savedWallets && walletsEl) {
+      walletsEl.value = savedWallets;
     }
     
-    if (savedTokens) {
-      document.getElementById('tokens').value = savedTokens;
+    if (savedTokens && tokensEl) {
+      tokensEl.value = savedTokens;
     }
     
     updateInputCounters();
+    debugLog('Saved inputs loaded successfully');
   } catch (error) {
-    debugLog('Failed to load saved inputs', 'warning');
+    debugLog('Failed to load saved inputs: ' + error.message, 'warning');
   }
 }
 
@@ -865,7 +877,7 @@ function loadSavedNetwork() {
       debugLog(`Loaded saved network: ${getNetworkName(savedNetwork)}`, 'info');
     }
   } catch (error) {
-    debugLog('Failed to load saved network', 'warning');
+    debugLog('Failed to load saved network: ' + error.message, 'warning');
   }
 }
 
@@ -874,8 +886,9 @@ function clearStorage() {
     localStorage.removeItem('wallet-analyzer-wallets');
     localStorage.removeItem('wallet-analyzer-tokens');
     localStorage.removeItem('wallet-analyzer-network');
+    debugLog('Storage cleared successfully');
   } catch (error) {
-    debugLog('Failed to clear storage', 'warning');
+    debugLog('Failed to clear storage: ' + error.message, 'warning');
   }
 }
 
@@ -1054,6 +1067,21 @@ function showModal(title, content) {
     }
   });
 }
+
+// Make UI functions globally available
+window.debugLog = debugLog;
+window.showError = showError;
+window.hideError = hideError;
+window.showLoading = showLoading;
+window.updateProgress = updateProgress;
+window.displayResults = displayResults;
+window.showValidationResults = showValidationResults;
+window.hideAllResults = hideAllResults;
+window.showToast = showToast;
+window.showModal = showModal;
+window.getSelectedNetwork = getSelectedNetwork;
+window.getNetworkName = getNetworkName;
+window.getNetworkIcon = getNetworkIcon;
 
 /**
  * Utility function for debouncing
